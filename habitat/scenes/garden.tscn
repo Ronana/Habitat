@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://c017yserk35hg" path="res://creatures/glowfox.tscn" id="4_k83q7"]
 [ext_resource type="PackedScene" uid="uid://xx6vrleum50s" path="res://scenes/player_cursor.tscn" id="5_77qwg"]
 [ext_resource type="PackedScene" uid="uid://cy1idyk70n5br" path="res://scenes/roamer_ui.tscn" id="6_o5anx"]
+[ext_resource type="PackedScene" uid="uid://drmbu2mtd3pfq" path="res://scenes/berry_bush.tscn" id="7_wdstj"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b0h10"]
 albedo_color = Color(0.2901961, 0.4862745, 0.24705882, 1)
@@ -63,3 +64,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 [node name="PlayerCursor" parent="." unique_id=2047336941 instance=ExtResource("5_77qwg")]
 
 [node name="RoamerUI" parent="." unique_id=1002129976 instance=ExtResource("6_o5anx")]
+
+[node name="BerryBush" parent="." unique_id=1691809664 groups=["food"] instance=ExtResource("7_wdstj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 5)

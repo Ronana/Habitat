@@ -24,3 +24,13 @@ func update_ui():
 	var stage_names = ["Appears", "Visits", "Resident", "Bonded"]
 	stage_label.text = "Stage: " + stage_names[tracked_roamer.attraction_stage]
 	food_bar.value = tracked_roamer.needs["food"]
+
+func _ready():
+	CurrencyManager.dewdrops_changed.connect(_on_dewdrops_changed)
+	update_currency()
+
+func _on_dewdrops_changed(_amount):
+	update_currency()
+
+func update_currency():
+	$Panel/VBoxContainer/CurrencyLabel.text = "Dewdrops: " + str(snappedf(CurrencyManager.dewdrops, 0.1))

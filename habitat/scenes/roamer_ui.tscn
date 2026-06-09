@@ -31,3 +31,7 @@ text = "Food:"
 layout_mode = 2
 max_value = 1.0
 value = 0.5
+
+[node name="CurrencyLabel" type="Label" parent="Panel/VBoxContainer" unique_id=752218013]
+layout_mode = 2
+text = "💧 Dewdrops: 50"

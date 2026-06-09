@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://drmbu2mtd3pfq"]
+
+[ext_resource type="Script" uid="uid://g55xqin214yr" path="res://scripts/berry_bush.gd" id="1_2f0f0"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xykto"]
+albedo_color = Color(0.1764706, 0.3529412, 0.11764706, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_johh4"]
+material = SubResource("StandardMaterial3D_xykto")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dy85o"]
+albedo_color = Color(0.54509807, 0.101960786, 0.101960786, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_c4udp"]
+material = SubResource("StandardMaterial3D_dy85o")
+radius = 0.15
+height = 0.3
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_g2tf3"]
+radius = 2.0
+
+[node name="BerryBush" type="Node3D" unique_id=1691809664]
+script = ExtResource("1_2f0f0")
+
+[node name="Bush" type="MeshInstance3D" parent="." unique_id=651570220]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("SphereMesh_johh4")
+
+[node name="Berries" type="MeshInstance3D" parent="." unique_id=267858299]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("SphereMesh_c4udp")
+
+[node name="FoodArea" type="Area3D" parent="." unique_id=1913970936]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FoodArea" unique_id=700464419]
+shape = SubResource("SphereShape3D_g2tf3")

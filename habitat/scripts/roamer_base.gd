@@ -10,6 +10,11 @@ var wander_timer: float = 0.0
 var idle_timer: float = 0.0
 var move_speed: float = 2.5
 var gravity: float = -20.0
+var dewdrop_timer: float = 0.0
+var dewdrop_interval: float = 5.0
+var hunger_threshold: float = 0.4
+var food_seek_timer: float = 0.0
+var food_seek_interval: float = 5.0
 
 # Needs — each fills from 0.0 to 1.0
 var needs = {
@@ -42,8 +47,39 @@ func _physics_process(delta):
 			handle_wandering(delta)
 		State.IDLE:
 			handle_idle(delta)
-
+	# Earn Dewdrops when Roamer is happy
+	dewdrop_timer += delta
+	if dewdrop_timer >= dewdrop_interval:
+		dewdrop_timer = 0.0
+		var earned = happiness * 2.0
+		CurrencyManager.add_dewdrops(earned)
+	# Seek food when hungry
+	food_seek_timer += delta
+	if food_seek_timer >= food_seek_interval:
+		food_seek_timer = 0.0
+		if needs["food"] < hunger_threshold:
+			seek_nearest_food()
 	move_and_slide()
+	
+func seek_nearest_food():
+	var food_items = get_tree().get_nodes_in_group("food")
+	if food_items.is_empty():
+		return
+	
+	var nearest = null
+	var nearest_dist = INF
+	
+	for item in food_items:
+		var dist = global_position.distance_to(item.global_position)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = item
+	
+	if nearest:
+		move_to(nearest.global_position)
+		print(name, " is seeking food!")
+
+
 
 func update_needs(delta):
 	for need in needs:
