@@ -5,10 +5,14 @@ extends Node3D
 @export var forest_radius: float = 80.0
 @export var min_scale: float = 0.6
 @export var max_scale: float = 1.6
+@export var starter_area_size: float = 40.0
+var base_ground_level: float = 0.0
 
 func _ready():
 	scatter_trees()
-	
+	create_boundary()
+	create_starter_bumps()
+	scatter_debris()
 	# Connect day night manager to scene lights
 	var sun = get_node("DirectionalLight3D")
 	var env = get_node("WorldEnvironment").environment
@@ -79,3 +83,114 @@ func scatter_trees():
 		
 		tree.rotation.y = randf_range(0, TAU)
 		i += 1
+
+func create_boundary():
+	var line_material = StandardMaterial3D.new()
+	line_material.albedo_color = Color(0.85, 0.82, 0.75, 0.9)
+	line_material.roughness = 1.0
+	line_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	line_material.no_depth_test = true
+	line_material.render_priority = 1
+	
+	var half = starter_area_size / 2.0
+	var lines = [
+		[Vector3(0, 0.05, -half), Vector3(starter_area_size + 0.4, 0.05, 0.15)],
+		[Vector3(0, 0.05, half), Vector3(starter_area_size + 0.4, 0.05, 0.15)],
+		[Vector3(-half, 0.05, 0), Vector3(0.15, 0.05, starter_area_size)],
+		[Vector3(half, 0.05, 0), Vector3(0.15, 0.05, starter_area_size)],
+	]
+	
+	for line_data in lines:
+		var mesh_instance = MeshInstance3D.new()
+		var box_mesh = BoxMesh.new()
+		box_mesh.size = line_data[1]
+		mesh_instance.mesh = box_mesh
+		mesh_instance.position = line_data[0]
+		var mat = line_material.duplicate()
+		mesh_instance.set_surface_override_material(0, mat)
+		mesh_instance.add_to_group("boundary_lines")
+		add_child(mesh_instance)
+
+func create_starter_bumps():
+	var ground_node = get_node("Ground")
+	var mdt = MeshDataTool.new()
+	var array_mesh = ArrayMesh.new()
+	array_mesh.add_surface_from_arrays(
+		Mesh.PRIMITIVE_TRIANGLES,
+		ground_node.mesh.surface_get_arrays(0)
+	)
+	mdt.create_from_surface(array_mesh, 0)
+	
+	var half = starter_area_size / 2.0
+	
+	for i in range(mdt.get_vertex_count()):
+		var vertex = mdt.get_vertex(i)
+		# Only bump vertices inside the starter area
+		if abs(vertex.x) < half and abs(vertex.z) < half:
+			# Random bumps above ground level
+			vertex.y = randf_range(0.2, 1.5)
+		mdt.set_vertex(i, vertex)
+	
+	array_mesh.clear_surfaces()
+	mdt.commit_to_surface(array_mesh)
+	ground_node.mesh = array_mesh
+	var mat = ground_node.get_active_material(0)
+	if mat:
+		ground_node.set_surface_override_material(0, mat)
+		
+	# Restore material after mesh rebuild
+	var ground_mat = StandardMaterial3D.new()
+	ground_mat.albedo_color = Color(0.29, 0.36, 0.18)
+	ground_mat.roughness = 0.9
+	ground_node.set_surface_override_material(0, ground_mat)
+	
+
+func scatter_debris():
+	var half = starter_area_size / 2.0
+	var debris_items = [
+		{"colour": Color(0.45, 0.35, 0.25), "scale": Vector3(0.8, 0.4, 0.6)},  # Rock
+		{"colour": Color(0.35, 0.25, 0.15), "scale": Vector3(1.2, 0.3, 0.4)},  # Log
+		{"colour": Color(0.3, 0.28, 0.2), "scale": Vector3(0.5, 0.5, 0.5)},    # Small rock
+		{"colour": Color(0.4, 0.32, 0.22), "scale": Vector3(0.6, 0.35, 0.5)},  # Stone
+	]
+	
+	for j in range(15):
+		var item = debris_items[randi() % debris_items.size()]
+		var mesh_instance = MeshInstance3D.new()
+		
+		if j % 2 == 0:
+			mesh_instance.mesh = BoxMesh.new()
+		else:
+			mesh_instance.mesh = SphereMesh.new()
+		
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = item["colour"]
+		mat.roughness = 1.0
+		mesh_instance.set_surface_override_material(0, mat)
+		
+		var x = randf_range(-half + 3, half - 3)
+		var z = randf_range(-half + 3, half - 3)
+		mesh_instance.position = Vector3(x, 0.5, z)
+		mesh_instance.scale = item["scale"]
+		mesh_instance.rotation.y = randf_range(0, TAU)
+		
+		add_child(mesh_instance)
+		mesh_instance.add_to_group("debris")
+		
+		
+func _process(_delta):
+	update_boundary_heights()
+
+func update_boundary_heights():
+	var half = starter_area_size / 2.0
+	var space_state = get_world_3d().direct_space_state
+	
+	var boundary_lines = get_tree().get_nodes_in_group("boundary_lines")
+	for line in boundary_lines:
+		# Cast ray down from above the line position
+		var ray_origin = Vector3(line.position.x, 10.0, line.position.z)
+		var ray_end = Vector3(line.position.x, -5.0, line.position.z)
+		var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+		var result = space_state.intersect_ray(query)
+		if result:
+			line.position.y = result.position.y + 0.05

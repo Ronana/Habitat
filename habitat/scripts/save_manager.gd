@@ -9,10 +9,27 @@ func save_game(_garden: Node):
 			"dewdrops": CurrencyManager.dewdrops,
 			"eldermoss": CurrencyManager.eldermoss
 		},
+		
 		"roamers": [],
 		"berry_bushes": []
 	}
-	
+		# Save terrain vertices
+	var ground = get_tree().get_root().get_node("Garden/Ground")
+	if ground and ground.mesh:
+		var mdt = MeshDataTool.new()
+		var arr_mesh = ArrayMesh.new()
+		arr_mesh.add_surface_from_arrays(
+			Mesh.PRIMITIVE_TRIANGLES,
+			ground.mesh.surface_get_arrays(0)
+		)
+		mdt.create_from_surface(arr_mesh, 0)
+		var vertices = []
+		for i in range(mdt.get_vertex_count()):
+			var v = mdt.get_vertex(i)
+			vertices.append({"x": v.x, "y": v.y, "z": v.z})
+		save_data["terrain"] = vertices
+
+
 	# Save all Roamers
 	for roamer in get_tree().get_nodes_in_group("roamers"):
 		save_data["roamers"].append({
@@ -73,6 +90,38 @@ func load_game(_garden: Node):
 	CurrencyManager.dewdrops = save_data["currency"]["dewdrops"]
 	CurrencyManager.eldermoss = save_data["currency"]["eldermoss"]
 	CurrencyManager.emit_signal("dewdrops_changed", CurrencyManager.dewdrops)
+	
+	# Restore terrain
+	if save_data.has("terrain"):
+		var ground = get_tree().get_root().get_node("Garden/Ground")
+		if ground and ground.mesh:
+			var mdt = MeshDataTool.new()
+			var arr_mesh = ArrayMesh.new()
+			arr_mesh.add_surface_from_arrays(
+				Mesh.PRIMITIVE_TRIANGLES,
+				ground.mesh.surface_get_arrays(0)
+			)
+			mdt.create_from_surface(arr_mesh, 0)
+			
+			var vertices = save_data["terrain"]
+			if vertices.size() == mdt.get_vertex_count():
+				for i in range(mdt.get_vertex_count()):
+					var v = mdt.get_vertex(i)
+					v.y = vertices[i]["y"]
+					mdt.set_vertex(i, v)
+				
+				arr_mesh.clear_surfaces()
+				mdt.commit_to_surface(arr_mesh)
+				ground.mesh = arr_mesh
+				
+				# Rebuild tool manager mesh data
+				await get_tree().process_frame
+				var tool_manager = get_tree().get_root().get_node("Garden/ToolManager")
+				if tool_manager:
+					tool_manager.build_mesh_data_tool()
+					tool_manager.apply_terrain_colours()
+				
+				print("Terrain restored successfully")
 	
 	# Restore Roamers
 	for roamer_data in save_data["roamers"]:

@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://dp765dfd4ab4y"]
+
+[ext_resource type="Script" uid="uid://cl2fjmnse0ami" path="res://scripts/ground_cursor.gd" id="1_r6uyw"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_r6uyw"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.83116233, 0.78818816, 0.6591482, 0.5)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_uy3ru"]
+top_radius = 0.3
+bottom_radius = 0.3
+height = 0.02
+
+[node name="GroundCursor" type="Node3D" unique_id=1377328291]
+script = ExtResource("1_r6uyw")
+
+[node name="CursorMesh" type="MeshInstance3D" parent="." unique_id=906956850]
+material_overlay = SubResource("StandardMaterial3D_r6uyw")
+mesh = SubResource("CylinderMesh_uy3ru")

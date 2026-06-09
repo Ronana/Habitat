@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://bln8w37off4uw" path="res://scenes/tool_manager.tscn" id="9_5pv02"]
 [ext_resource type="PackedScene" uid="uid://bqrg6quaigfo4" path="res://scenes/maren.tscn" id="10_wiw1g"]
 [ext_resource type="PackedScene" uid="uid://c1lkhe5e3ixcb" path="res://scenes/field_journal.tscn" id="11_8csfy"]
+[ext_resource type="PackedScene" uid="uid://dp765dfd4ab4y" path="res://scenes/ground_cursor.tscn" id="12_dfwg7"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b0h10"]
 albedo_color = Color(0.2901961, 0.41960785, 0.20784314, 1)
@@ -109,3 +110,5 @@ process_material = SubResource("ParticleProcessMaterial_wiw1g")
 draw_pass_1 = SubResource("QuadMesh_8csfy")
 
 [node name="FieldJournal" parent="." unique_id=938521938 instance=ExtResource("11_8csfy")]
+
+[node name="GroundCursor" parent="." unique_id=1377328291 instance=ExtResource("12_dfwg7")]

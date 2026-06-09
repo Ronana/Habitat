@@ -59,6 +59,12 @@ func _physics_process(delta):
 		food_seek_timer = 0.0
 		if needs["food"] < hunger_threshold:
 			seek_nearest_food()
+		# Push back inside boundary if somehow outside
+	var half_area = 19.0
+	if abs(global_position.x) > half_area or abs(global_position.z) > half_area:
+		global_position.x = clamp(global_position.x, -half_area, half_area)
+		global_position.z = clamp(global_position.z, -half_area, half_area)
+		pick_wander_target()
 	move_and_slide()
 	
 func seek_nearest_food():
@@ -119,11 +125,19 @@ func handle_idle(delta):
 
 func pick_wander_target():
 	var wander_range = 20.0
-	wander_target = global_position + Vector3(
+	var half_area = 19.0  # Slightly inside the 40x40 boundary
+	
+	var new_target = global_position + Vector3(
 		randf_range(-wander_range, wander_range),
 		0,
 		randf_range(-wander_range, wander_range)
 	)
+	
+	# Clamp target inside starter area
+	new_target.x = clamp(new_target.x, -half_area, half_area)
+	new_target.z = clamp(new_target.z, -half_area, half_area)
+	
+	wander_target = new_target
 	wander_timer = randf_range(4.0, 10.0)
 
 func move_to(target: Vector3):
