@@ -17,17 +17,13 @@ func _ready():
 	WeatherManager.environment = env
 	WeatherManager.sun = sun
 	WeatherManager.rain_particles = get_node("RainParticles")
+	SeasonManager.environment = env
+	SeasonManager.sun = sun
 	
 	# Try to load save
-	var loaded = SaveManager.load_game(self)
+	var loaded = await SaveManager.load_game(self)
 	if not loaded:
 		print("Fresh wilderness — no save found")
-		
-	# Test rain particles
-	var rain = get_node("RainParticles")
-	rain.emitting = true
-	print("Rain particles emitting: ", rain.emitting)
-	print("Rain particle amount: ", rain.amount)
 
 func _input(event):
 	if event is InputEventKey and event.pressed:
@@ -46,6 +42,27 @@ func _input(event):
 			WeatherManager.set_weather(WeatherManager.Weather.FOG)
 		if event.keycode == KEY_4:
 			WeatherManager.set_weather(WeatherManager.Weather.WIND)
+			# Press F1-F4 to force seasons for testing
+		if event.keycode == KEY_F1:
+			SeasonManager.current_season = SeasonManager.Season.SPRING
+			SeasonManager.apply_season()
+			WeatherManager.apply_weather_effects()
+			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
+		if event.keycode == KEY_F2:
+			SeasonManager.current_season = SeasonManager.Season.SUMMER
+			SeasonManager.apply_season()
+			WeatherManager.apply_weather_effects()
+			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
+		if event.keycode == KEY_F3:
+			SeasonManager.current_season = SeasonManager.Season.AUTUMN
+			SeasonManager.apply_season()
+			WeatherManager.apply_weather_effects()
+			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
+		if event.keycode == KEY_F4:
+			SeasonManager.current_season = SeasonManager.Season.WINTER
+			SeasonManager.apply_season()
+			WeatherManager.apply_weather_effects()
+			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
 
 func scatter_trees():
 	var i = 0

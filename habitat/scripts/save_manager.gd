@@ -43,7 +43,7 @@ func save_game(_garden: Node):
 	file.close()
 	print("Game saved successfully!")
 
-func load_game(garden: Node):
+func load_game(_garden: Node):
 	if not FileAccess.file_exists(SAVE_PATH):
 		print("No save file found — starting fresh")
 		return false
@@ -63,9 +63,11 @@ func load_game(garden: Node):
 	# Remove existing Roamers and bushes before loading
 	for roamer in get_tree().get_nodes_in_group("roamers"):
 		roamer.queue_free()
-	
 	for bush in get_tree().get_nodes_in_group("food"):
 		bush.queue_free()
+	
+	# Wait one frame for queue_free to complete
+	await get_tree().process_frame
 	
 	# Restore currency
 	CurrencyManager.dewdrops = save_data["currency"]["dewdrops"]
@@ -77,7 +79,8 @@ func load_game(garden: Node):
 		var scene = load(roamer_data["scene"])
 		if scene:
 			var roamer = scene.instantiate()
-			garden.add_child(roamer)
+			roamer.name = roamer_data["name"]
+			_garden.add_child(roamer)
 			roamer.global_position = Vector3(
 				roamer_data["position"]["x"],
 				roamer_data["position"]["y"],
@@ -90,7 +93,7 @@ func load_game(garden: Node):
 	var bush_scene = load("res://scenes/berry_bush.tscn")
 	for bush_data in save_data["berry_bushes"]:
 		var bush = bush_scene.instantiate()
-		garden.add_child(bush)
+		_garden.add_child(bush)
 		bush.global_position = Vector3(
 			bush_data["position"]["x"],
 			bush_data["position"]["y"],

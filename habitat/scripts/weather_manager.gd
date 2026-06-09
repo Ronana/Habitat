@@ -53,29 +53,37 @@ func set_weather(new_weather: Weather):
 func apply_weather_effects():
 	if not environment or not sun:
 		return
+	
+	# Get base values from current season
+	var season_sun_energy = SeasonManager.season_data[SeasonManager.current_season]["sun_energy"]
+	var season_ambient = SeasonManager.season_data[SeasonManager.current_season]["ambient_colour"]
+	
 	match current_weather:
 		Weather.SUNNY:
-			sun.light_energy = 1.8
+			sun.light_energy = season_sun_energy
+			environment.ambient_light_color = season_ambient
 			environment.fog_enabled = false
-			environment.fog_density = 0.0
 			if rain_particles:
 				rain_particles.emitting = false
 		Weather.RAIN:
-			sun.light_energy = 0.6
+			sun.light_energy = season_sun_energy * 0.4
+			environment.ambient_light_color = season_ambient.darkened(0.3)
 			environment.fog_enabled = true
 			environment.fog_density = 0.003
 			environment.fog_light_color = Color(0.6, 0.6, 0.7)
 			if rain_particles:
 				rain_particles.emitting = true
 		Weather.FOG:
-			sun.light_energy = 0.4
+			sun.light_energy = season_sun_energy * 0.3
+			environment.ambient_light_color = season_ambient.lightened(0.1)
 			environment.fog_enabled = true
 			environment.fog_density = 0.015
 			environment.fog_light_color = Color(0.8, 0.85, 0.9)
 			if rain_particles:
 				rain_particles.emitting = false
 		Weather.WIND:
-			sun.light_energy = 1.4
+			sun.light_energy = season_sun_energy * 0.9
+			environment.ambient_light_color = season_ambient
 			environment.fog_enabled = false
 			if rain_particles:
 				rain_particles.emitting = false

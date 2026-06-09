@@ -51,7 +51,7 @@ func _physics_process(delta):
 	dewdrop_timer += delta
 	if dewdrop_timer >= dewdrop_interval:
 		dewdrop_timer = 0.0
-		var earned = happiness * 2.0
+		var earned = happiness * 2.0 * SeasonManager.get_dewdrop_multiplier()
 		CurrencyManager.add_dewdrops(earned)
 	# Seek food when hungry
 	food_seek_timer += delta
@@ -89,7 +89,7 @@ func update_happiness():
 	var total = 0.0
 	for need in needs:
 		total += needs[need]
-	happiness = total / needs.size()
+	happiness = clamp((total / needs.size()) + SeasonManager.get_happiness_bonus(), 0.0, 1.0)
 
 func handle_wandering(delta):
 	wander_timer -= delta

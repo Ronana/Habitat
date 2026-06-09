@@ -63,12 +63,19 @@ func update_lighting():
 	var sun_angle = (current_time / 24.0) * 360.0 - 90.0
 	sun.rotation_degrees.x = -sun_angle
 	
-	# Interpolate sun colour and energy
-	sun.light_color = get_interpolated_colour(sun_colours, current_time)
-	sun.light_energy = get_interpolated_float(sun_energy, current_time)
+	# Get base energy from current season
+	var season_base_energy = SeasonManager.season_data[SeasonManager.current_season]["sun_energy"]
 	
-	# Interpolate ambient light colour
-	environment.ambient_light_color = get_interpolated_colour(sky_colours, current_time)
+	# Interpolate sun colour only — let season control energy
+	sun.light_color = get_interpolated_colour(sun_colours, current_time)
+	
+	# Blend day/night energy with season energy
+	var day_factor = get_interpolated_float(sun_energy, current_time)
+	sun.light_energy = day_factor * season_base_energy
+	
+	# Ambient light from season
+	var season_ambient = SeasonManager.season_data[SeasonManager.current_season]["ambient_colour"]
+	environment.ambient_light_color = season_ambient
 	environment.ambient_light_energy = lerp(0.1, 0.5, sin((current_time / 24.0) * PI))
 
 func get_interpolated_colour(colour_map: Dictionary, time: float) -> Color:

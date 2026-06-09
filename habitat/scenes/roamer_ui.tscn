@@ -56,6 +56,14 @@ text = "🕐 08:00"
 layout_mode = 2
 text = "☀️ Sunny"
 
+[node name="JournalButton" type="Button" parent="Panel/VBoxContainer" unique_id=1637680919]
+layout_mode = 2
+text = "📖 Journal (J)"
+
+[node name="SeasonLabel" type="Label" parent="Panel/VBoxContainer" unique_id=465804813]
+layout_mode = 2
+text = "🌸 Spring — Day 1"
+
 [node name="ShopPanel" type="PanelContainer" parent="." unique_id=1357719498 groups=["ui_panels"]]
 visible = false
 custom_minimum_size = Vector2(300, 400)

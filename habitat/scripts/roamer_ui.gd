@@ -26,7 +26,9 @@ func _ready():
 	WardenManager.xp_gained.connect(_on_xp_gained)
 	WardenManager.level_up.connect(_on_level_up)
 	update_warden_ui()
-	
+	SeasonManager.season_changed.connect(_on_season_changed)
+	SeasonManager.day_passed.connect(_on_day_passed)
+	update_season_ui()
 	# Connect shop buttons
 	$ShopPanel/VBoxContainer/Item0.pressed.connect(_on_buy_item.bind(0))
 	$ShopPanel/VBoxContainer/Item1.pressed.connect(_on_buy_item.bind(1))
@@ -34,7 +36,9 @@ func _ready():
 	$ShopPanel/VBoxContainer/Item3.pressed.connect(_on_buy_item.bind(3))
 	$ShopPanel/VBoxContainer/CloseButton.pressed.connect(close_shop)
 	$Panel/VBoxContainer/SaveButton.pressed.connect(_on_save)
-	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)#
+	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)
+	$Panel/VBoxContainer/JournalButton.pressed.connect(_on_journal_button)
+	print("SeasonLabel found: ", has_node("Panel/VBoxContainer/SeasonLabel"))
 	
 	
 
@@ -151,3 +155,20 @@ func update_warden_ui():
 func show_level_up_message():
 	# Simple level up notification for now
 	print("UI: Level up to ", WardenManager.current_level)
+
+func _on_journal_button():
+	var journal = get_tree().get_root().get_node("Garden/FieldJournal")
+	journal.toggle_journal()
+
+func _on_season_changed(_season):
+	update_season_ui()
+
+func _on_day_passed(_day):
+	update_season_ui()
+
+func update_season_ui():
+	var label = $Panel/VBoxContainer/SeasonLabel
+	if label:
+		label.text = SeasonManager.get_season_string()
+	else:
+		print("ERROR: SeasonLabel not found")
