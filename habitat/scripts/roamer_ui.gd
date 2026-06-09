@@ -6,6 +6,9 @@ extends CanvasLayer
 @onready var currency_label = $Panel/VBoxContainer/CurrencyLabel
 @onready var shop_panel = $ShopPanel
 @onready var shop_dewdrops = $ShopPanel/VBoxContainer/DewdropsLabel
+@onready var inventory_panel = $InventoryPanel
+@onready var item_list = $InventoryPanel/VBoxContainer/ItemList
+@onready var ToolManager_ref = get_tree().get_root().get_node("Garden/ToolManager")
 
 var tracked_roamer = null
 var current_trader = null
@@ -13,6 +16,8 @@ var current_trader = null
 func _ready():
 	CurrencyManager.dewdrops_changed.connect(_on_dewdrops_changed)
 	update_currency()
+	InventoryManager.inventory_changed.connect(update_inventory_ui)
+	update_inventory_ui()
 	
 	# Connect shop buttons
 	$ShopPanel/VBoxContainer/Item0.pressed.connect(_on_buy_item.bind(0))
@@ -22,6 +27,7 @@ func _ready():
 	$ShopPanel/VBoxContainer/CloseButton.pressed.connect(close_shop)
 	$Panel/VBoxContainer/SaveButton.pressed.connect(_on_save)
 	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)
+	
 
 func _process(_delta):
 	if tracked_roamer:
@@ -72,3 +78,38 @@ func _on_save():
 func _on_load():
 	SaveManager.load_game(get_tree().get_root().get_node("Garden"))
 	print("Loaded from UI!")
+
+func update_inventory_ui():
+	# Clear existing items
+	for child in item_list.get_children():
+		child.queue_free()
+	
+	var items = InventoryManager.get_all_items()
+	if items.is_empty():
+		var empty_label = Label.new()
+		empty_label.text = "Empty"
+		item_list.add_child(empty_label)
+		return
+	
+	# Add a button for each item
+	for item_name in items:
+		var btn = Button.new()
+		btn.text = item_name + " x" + str(items[item_name])
+		btn.pressed.connect(_on_inventory_item_pressed.bind(item_name))
+		item_list.add_child(btn)
+
+func _on_inventory_item_pressed(item_name: String):
+	if item_name == "Fresh Berries":
+		use_fresh_berries()
+		return
+	# Set as active placement item
+	ToolManager_ref.set_placement_item(item_name)
+	print("Selected for placement: ", item_name)
+	
+func use_fresh_berries():
+	if not tracked_roamer:
+		print("Select a Roamer first!")
+		return
+	if InventoryManager.remove_item("Fresh Berries"):
+		tracked_roamer.feed(0.5)
+		print("Fed fresh berries to ", tracked_roamer.name)

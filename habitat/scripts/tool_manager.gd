@@ -7,6 +7,8 @@ var spade_radius: float = 8.0
 var spade_strength: float = 2.0
 var raise_terrain: bool = true
 var original_material: Material
+var placement_item: String = ""
+var berry_bush_scene: PackedScene = preload("res://scenes/berry_bush.tscn")
 
 var ground_mesh: MeshInstance3D
 var mesh_data_tool: MeshDataTool
@@ -41,6 +43,34 @@ func _input(event):
 			elif Input.is_key_pressed(KEY_ALT):
 				raise_terrain = true
 				use_spade()
+		if event.button_index == MOUSE_BUTTON_RIGHT and not selected_roamer_exists():
+			if placement_item != "":
+				place_item()	
+				
+func selected_roamer_exists() -> bool:
+	return get_parent().get_node("PlayerCursor").selected_roamer != null
+
+func place_item():
+	var cam = get_viewport().get_camera_3d()
+	if not cam:
+		return
+	var mouse_pos = get_viewport().get_mouse_position()
+	var ray_origin = cam.project_ray_origin(mouse_pos)
+	var ray_end = ray_origin + cam.project_ray_normal(mouse_pos) * 200.0
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	var result = space_state.intersect_ray(query)
+
+	if result:
+		match placement_item:
+			"Berry Seeds":
+				if InventoryManager.remove_item("Berry Seeds"):
+					var bush = berry_bush_scene.instantiate()
+					get_parent().add_child(bush)
+					bush.global_position = result.position
+					print("Berry bush planted!")
+					placement_item = ""
+
 
 func use_spade():
 	print("use_spade called")
@@ -76,6 +106,12 @@ func deform_terrain(hit_pos: Vector3):
 			vertices_affected += 1
 	
 	print("Vertices affected: ", vertices_affected)
+	
+func set_placement_item(item_name: String):
+	placement_item = item_name
+	print("Ready to place: ", item_name)
+	
+	
 	
 	# Rebuild the mesh
 	array_mesh.clear_surfaces()

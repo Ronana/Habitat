@@ -38,10 +38,10 @@ func buy_item(index: int):
 func apply_purchase(item_name: String):
 	match item_name:
 		"Berry Seeds":
-			print("Berry seeds added to inventory — place them in the world!")
+			InventoryManager.add_item("Berry Seeds")
 		"Wildgrass Seeds":
-			print("Wildgrass seeds added to inventory!")
+			InventoryManager.add_item("Wildgrass Seeds")
 		"Oak Sapling":
-			print("Oak sapling added to inventory!")
+			InventoryManager.add_item("Oak Sapling")
 		"Fresh Berries":
-			print("Fresh berries added to inventory — double click a Roamer to feed them!")
+			InventoryManager.add_item("Fresh Berries")
