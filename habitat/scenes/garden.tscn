@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://xx6vrleum50s" path="res://scenes/player_cursor.tscn" id="5_77qwg"]
 [ext_resource type="PackedScene" uid="uid://cy1idyk70n5br" path="res://scenes/roamer_ui.tscn" id="6_o5anx"]
 [ext_resource type="PackedScene" uid="uid://drmbu2mtd3pfq" path="res://scenes/berry_bush.tscn" id="7_wdstj"]
+[ext_resource type="PackedScene" uid="uid://b4hn7obb75dth" path="res://creatures/mossdeer.tscn" id="8_1vq1v"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b0h10"]
 albedo_color = Color(0.2901961, 0.4862745, 0.24705882, 1)
@@ -47,7 +48,7 @@ mesh = SubResource("PlaneMesh_b0h10")
 shape = SubResource("BoxShape3D_k83q7")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=978597290]
-transform = Transform3D(0.8660254, 0.35355338, -0.35355338, 0, 0.70710677, 0.70710677, 0.5, -0.6123724, 0.6123724, 0, 0, 0)
+transform = Transform3D(0.8660254, 0.3535534, -0.3535534, 0, 0.7071068, 0.7071068, 0.5, -0.61237246, 0.61237246, 0, 4.8102603, 0)
 light_energy = 1.5
 
 [node name="MainCamera" type="Camera3D" parent="." unique_id=1952052033]
@@ -60,6 +61,9 @@ environment = SubResource("Environment_4iwim")
 
 [node name="GlowFox" parent="." unique_id=1061477021 instance=ExtResource("4_k83q7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="Mossdeer" parent="." unique_id=1899289714 groups=["roamers"] instance=ExtResource("8_1vq1v")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, -10)
 
 [node name="PlayerCursor" parent="." unique_id=2047336941 instance=ExtResource("5_77qwg")]
 

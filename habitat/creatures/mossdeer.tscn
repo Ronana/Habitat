@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://b4hn7obb75dth"]
+
+[ext_resource type="Script" uid="uid://ww18feya0ucr" path="res://scripts/mossdeer.gd" id="1_24iji"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pe1he"]
+albedo_color = Color(0.54509807, 0.4509804, 0.33333334, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_pe1nj"]
+material = SubResource("StandardMaterial3D_pe1he")
+height = 1.6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1ravv"]
+albedo_color = Color(0.1764706, 0.3529412, 0.11764706, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_d5wfj"]
+material = SubResource("StandardMaterial3D_1ravv")
+top_radius = 0.05
+bottom_radius = 0.05
+height = 0.8
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_aitnm"]
+height = 1.6
+
+[node name="Mossdeer" type="CharacterBody3D" unique_id=1899289714]
+script = ExtResource("1_24iji")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=843322906]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+mesh = SubResource("CapsuleMesh_pe1nj")
+
+[node name="Antlers" type="MeshInstance3D" parent="." unique_id=766455163]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+mesh = SubResource("CylinderMesh_d5wfj")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=385751821]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("CapsuleShape3D_aitnm")
