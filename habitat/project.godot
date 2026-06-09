@@ -21,6 +21,7 @@ CurrencyManager="*uid://ccba6g3pxf5bi"
 SaveManager="*uid://b2nj4vpst24mr"
 DayNightManager="*uid://dh04x65kqofja"
 InventoryManager="*uid://dl14j51s37ici"
+WeatherManager="*uid://cd878p7bqsd75"
 
 [physics]
 

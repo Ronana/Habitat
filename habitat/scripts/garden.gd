@@ -14,11 +14,20 @@ func _ready():
 	var env = get_node("WorldEnvironment").environment
 	DayNightManager.sun = sun
 	DayNightManager.environment = env
+	WeatherManager.environment = env
+	WeatherManager.sun = sun
+	WeatherManager.rain_particles = get_node("RainParticles")
 	
 	# Try to load save
 	var loaded = SaveManager.load_game(self)
 	if not loaded:
 		print("Fresh wilderness — no save found")
+		
+	# Test rain particles
+	var rain = get_node("RainParticles")
+	rain.emitting = true
+	print("Rain particles emitting: ", rain.emitting)
+	print("Rain particle amount: ", rain.amount)
 
 func _input(event):
 	if event is InputEventKey and event.pressed:
@@ -28,6 +37,15 @@ func _input(event):
 		# Press F9 to load
 		if event.keycode == KEY_F9:
 			SaveManager.load_game(self)
+		# Press 1-4 to force weather for testing
+		if event.keycode == KEY_1:
+			WeatherManager.set_weather(WeatherManager.Weather.SUNNY)
+		if event.keycode == KEY_2:
+			WeatherManager.set_weather(WeatherManager.Weather.RAIN)
+		if event.keycode == KEY_3:
+			WeatherManager.set_weather(WeatherManager.Weather.FOG)
+		if event.keycode == KEY_4:
+			WeatherManager.set_weather(WeatherManager.Weather.WIND)
 
 func scatter_trees():
 	var i = 0

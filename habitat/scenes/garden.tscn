@@ -38,6 +38,25 @@ fog_enabled = true
 fog_light_color = Color(0.78431374, 0.84705883, 0.6901961, 1)
 fog_density = 0.002
 
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_wiw1g"]
+emission_shape = 3
+emission_box_extents = Vector3(100, 1, 100)
+direction = Vector3(0, -1, 0)
+spread = 180.0
+initial_velocity_min = 10.0
+initial_velocity_max = 15.0
+scale_min = 0.29999998
+scale_max = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wiw1g"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 1, 1, 0.6)
+
+[sub_resource type="QuadMesh" id="QuadMesh_8csfy"]
+material = SubResource("StandardMaterial3D_wiw1g")
+size = Vector2(0.1, 0.5)
+
 [node name="Garden" type="Node3D" unique_id=1493046901]
 script = ExtResource("1_4iwim")
 tree_scene = ExtResource("2_t3x5t")
@@ -79,3 +98,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 5)
 
 [node name="Maren" parent="." unique_id=1589191564 instance=ExtResource("10_wiw1g")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, 0)
+
+[node name="RainParticles" type="GPUParticles3D" parent="." unique_id=4723448]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
+amount = 1000
+lifetime = 2.0
+visibility_aabb = AABB(-100, -30, -100, 200, 50, 200)
+process_material = SubResource("ParticleProcessMaterial_wiw1g")
+draw_pass_1 = SubResource("QuadMesh_8csfy")

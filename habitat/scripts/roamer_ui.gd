@@ -18,6 +18,7 @@ func _ready():
 	update_currency()
 	InventoryManager.inventory_changed.connect(update_inventory_ui)
 	update_inventory_ui()
+	WeatherManager.weather_changed.connect(_on_weather_changed)
 	
 	# Connect shop buttons
 	$ShopPanel/VBoxContainer/Item0.pressed.connect(_on_buy_item.bind(0))
@@ -113,3 +114,15 @@ func use_fresh_berries():
 	if InventoryManager.remove_item("Fresh Berries"):
 		tracked_roamer.feed(0.5)
 		print("Fed fresh berries to ", tracked_roamer.name)
+		
+func _on_weather_changed(new_weather):
+	update_weather_ui()
+
+func update_weather_ui():
+	var icons = {
+		0: "☀️ Sunny",
+		1: "🌧️ Raining",
+		2: "🌫️ Foggy",
+		3: "💨 Windy"
+	}
+	$Panel/VBoxContainer/WeatherLabel.text = icons[WeatherManager.current_weather]
