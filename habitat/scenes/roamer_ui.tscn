@@ -5,7 +5,7 @@
 [node name="RoamerUI" type="CanvasLayer" unique_id=1002129976]
 script = ExtResource("1_5rfuv")
 
-[node name="Panel" type="PanelContainer" parent="." unique_id=701083411]
+[node name="Panel" type="PanelContainer" parent="." unique_id=701083411 groups=["ui_panels"]]
 custom_minimum_size = Vector2(250, 150)
 offset_left = 20.0
 offset_top = 20.0
@@ -56,7 +56,7 @@ text = "🕐 08:00"
 layout_mode = 2
 text = "☀️ Sunny"
 
-[node name="ShopPanel" type="PanelContainer" parent="." unique_id=1357719498]
+[node name="ShopPanel" type="PanelContainer" parent="." unique_id=1357719498 groups=["ui_panels"]]
 visible = false
 custom_minimum_size = Vector2(300, 400)
 offset_left = 400.0
@@ -95,7 +95,7 @@ text = "Fresh Berries — 8💧"
 layout_mode = 2
 text = "Close"
 
-[node name="InventoryPanel" type="PanelContainer" parent="." unique_id=1582779620]
+[node name="InventoryPanel" type="PanelContainer" parent="." unique_id=1582779620 groups=["ui_panels"]]
 custom_minimum_size = Vector2(250, 200)
 offset_left = 20.0
 offset_top = 500.0
@@ -111,3 +111,29 @@ text = "🎒 Inventory"
 
 [node name="ItemList" type="VBoxContainer" parent="InventoryPanel/VBoxContainer" unique_id=1639195958]
 layout_mode = 2
+
+[node name="WardenPanel" type="PanelContainer" parent="." unique_id=1201929764 groups=["ui_panels"]]
+custom_minimum_size = Vector2(250, 120)
+offset_left = 900.0
+offset_top = 20.0
+offset_right = 940.0
+offset_bottom = 60.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="WardenPanel" unique_id=1892616662]
+layout_mode = 2
+
+[node name="WardenTitle" type="Label" parent="WardenPanel/VBoxContainer" unique_id=2025683771]
+layout_mode = 2
+text = "🌿 Apprentice Warden"
+
+[node name="LevelLabel" type="Label" parent="WardenPanel/VBoxContainer" unique_id=2070622372]
+layout_mode = 2
+text = "Level 1"
+
+[node name="XPLabel" type="Label" parent="WardenPanel/VBoxContainer" unique_id=1026361364]
+layout_mode = 2
+text = "XP: 0 / 100"
+
+[node name="XPBar" type="ProgressBar" parent="WardenPanel/VBoxContainer" unique_id=1875002830]
+layout_mode = 2
+max_value = 1.0

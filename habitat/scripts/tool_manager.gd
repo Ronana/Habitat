@@ -34,18 +34,30 @@ func build_mesh_data_tool():
 	mesh_data_tool.create_from_surface(array_mesh, 0)
 
 func _input(event):
-	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			print("Left click detected in ToolManager")
-			if Input.is_key_pressed(KEY_SHIFT):
-				raise_terrain = false
-				use_spade()
-			elif Input.is_key_pressed(KEY_ALT):
-				raise_terrain = true
-				use_spade()
-		if event.button_index == MOUSE_BUTTON_RIGHT and not selected_roamer_exists():
-			if placement_item != "":
-				place_item()	
+	if not event is InputEventMouseButton:
+		return
+	if not event.pressed:
+		return
+	
+	# Left click — terrain tools only
+	if event.button_index == MOUSE_BUTTON_LEFT:
+		if Input.is_key_pressed(KEY_SHIFT):
+			raise_terrain = false
+			use_spade()
+			get_viewport().set_input_as_handled()
+			return
+		if Input.is_key_pressed(KEY_ALT):
+			raise_terrain = true
+			use_spade()
+			get_viewport().set_input_as_handled()
+			return
+	
+	# Right click — place item if one is selected
+	if event.button_index == MOUSE_BUTTON_RIGHT:
+		if placement_item != "":
+			place_item()
+			get_viewport().set_input_as_handled()
+			return
 				
 func selected_roamer_exists() -> bool:
 	return get_parent().get_node("PlayerCursor").selected_roamer != null
@@ -92,6 +104,7 @@ func use_spade():
 		print("Ray hit nothing")
 
 func deform_terrain(hit_pos: Vector3):
+	WardenManager.gain_xp("terrain_shaped")
 	var direction = 1.0 if raise_terrain else -1.0
 	var vertices_affected = 0
 	
@@ -105,16 +118,12 @@ func deform_terrain(hit_pos: Vector3):
 			mesh_data_tool.set_vertex(i, vertex)
 			vertices_affected += 1
 	
-	print("Vertices affected: ", vertices_affected)
-	
-func set_placement_item(item_name: String):
-	placement_item = item_name
-	print("Ready to place: ", item_name)
-	
-	
-	
-	# Rebuild the mesh
+		# Rebuild the mesh
 	array_mesh.clear_surfaces()
 	mesh_data_tool.commit_to_surface(array_mesh)
 	ground_mesh.mesh = array_mesh
 	ground_mesh.set_surface_override_material(0, original_material)
+	
+func set_placement_item(item_name: String):
+	placement_item = item_name
+	print("Ready to place: ", item_name)

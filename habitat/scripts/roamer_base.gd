@@ -133,7 +133,7 @@ func move_to(target: Vector3):
 
 func feed(food_value: float):
 	needs["food"] = min(1.0, needs["food"] + food_value)
-	print("Fed! Food need: ", needs["food"])
+	WardenManager.gain_xp("roamer_fed")
 	check_stage_progress()
 
 func check_stage_progress():
@@ -142,14 +142,17 @@ func check_stage_progress():
 			if happiness > 0.5:
 				attraction_stage = AttractionStage.VISITS
 				print(name, " is now VISITING!")
+				WardenManager.gain_xp("roamer_visits")
 		AttractionStage.VISITS:
 			if happiness > 0.7:
 				attraction_stage = AttractionStage.RESIDENT
 				print(name, " is now a RESIDENT!")
+				WardenManager.gain_xp("roamer_resident")
 		AttractionStage.RESIDENT:
 			if happiness > 0.9:
 				attraction_stage = AttractionStage.BONDED
 				print(name, " is now BONDED!")
+				WardenManager.gain_xp("roamer_bonded")
 
 func on_selected():
 	var body = get_node("Body")

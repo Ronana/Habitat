@@ -9,6 +9,10 @@ extends CanvasLayer
 @onready var inventory_panel = $InventoryPanel
 @onready var item_list = $InventoryPanel/VBoxContainer/ItemList
 @onready var ToolManager_ref = get_tree().get_root().get_node("Garden/ToolManager")
+@onready var warden_title = $WardenPanel/VBoxContainer/WardenTitle
+@onready var level_label = $WardenPanel/VBoxContainer/LevelLabel
+@onready var xp_label = $WardenPanel/VBoxContainer/XPLabel
+@onready var xp_bar = $WardenPanel/VBoxContainer/XPBar
 
 var tracked_roamer = null
 var current_trader = null
@@ -19,6 +23,9 @@ func _ready():
 	InventoryManager.inventory_changed.connect(update_inventory_ui)
 	update_inventory_ui()
 	WeatherManager.weather_changed.connect(_on_weather_changed)
+	WardenManager.xp_gained.connect(_on_xp_gained)
+	WardenManager.level_up.connect(_on_level_up)
+	update_warden_ui()
 	
 	# Connect shop buttons
 	$ShopPanel/VBoxContainer/Item0.pressed.connect(_on_buy_item.bind(0))
@@ -27,7 +34,8 @@ func _ready():
 	$ShopPanel/VBoxContainer/Item3.pressed.connect(_on_buy_item.bind(3))
 	$ShopPanel/VBoxContainer/CloseButton.pressed.connect(close_shop)
 	$Panel/VBoxContainer/SaveButton.pressed.connect(_on_save)
-	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)
+	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)#
+	
 	
 
 func _process(_delta):
@@ -126,3 +134,20 @@ func update_weather_ui():
 		3: "💨 Windy"
 	}
 	$Panel/VBoxContainer/WeatherLabel.text = icons[WeatherManager.current_weather]
+
+func _on_xp_gained(_amount, _total):
+	update_warden_ui()
+
+func _on_level_up(_new_level):
+	update_warden_ui()
+	show_level_up_message()
+
+func update_warden_ui():
+	warden_title.text = "🌿 " + WardenManager.get_title()
+	level_label.text = "Level " + str(WardenManager.current_level)
+	xp_label.text = "XP: " + str(int(WardenManager.current_xp)) + " / " + str(int(WardenManager.xp_to_next_level))
+	xp_bar.value = WardenManager.get_level_progress()
+
+func show_level_up_message():
+	# Simple level up notification for now
+	print("UI: Level up to ", WardenManager.current_level)
