@@ -9,7 +9,13 @@ extends Node3D
 func _ready():
 	scatter_trees()
 	
-	# Try to load a save — if none exists start fresh
+	# Connect day night manager to scene lights
+	var sun = get_node("DirectionalLight3D")
+	var env = get_node("WorldEnvironment").environment
+	DayNightManager.sun = sun
+	DayNightManager.environment = env
+	
+	# Try to load save
 	var loaded = SaveManager.load_game(self)
 	if not loaded:
 		print("Fresh wilderness — no save found")

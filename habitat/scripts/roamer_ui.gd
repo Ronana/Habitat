@@ -26,6 +26,9 @@ func _ready():
 func _process(_delta):
 	if tracked_roamer:
 		update_ui()
+		
+	# Day/Night Cycle
+	$Panel/VBoxContainer/ClockLabel.text = "🕐 " + DayNightManager.get_time_string()
 
 func show_roamer(roamer):
 	tracked_roamer = roamer
