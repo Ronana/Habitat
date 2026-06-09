@@ -35,3 +35,7 @@ value = 0.5
 [node name="CurrencyLabel" type="Label" parent="Panel/VBoxContainer" unique_id=752218013]
 layout_mode = 2
 text = "💧 Dewdrops: 50"
+
+[node name="ToolLabel" type="Label" parent="Panel/VBoxContainer" unique_id=294024903]
+layout_mode = 2
+text = "🔧 Tool: Spade"

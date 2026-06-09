@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bln8w37off4uw"]
+
+[ext_resource type="Script" uid="uid://rw03phnbsqpd" path="res://scripts/tool_manager.gd" id="1_bc54w"]
+
+[node name="ToolManager" type="Node3D" unique_id=1171000714]
+script = ExtResource("1_bc54w")
