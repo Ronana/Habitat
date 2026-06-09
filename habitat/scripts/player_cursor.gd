@@ -9,7 +9,7 @@ func _input(event):
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			print("Click detected")
 			try_select_roamer()
-		
+			try_interact_with_trader()
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			if selected_roamer:
 				try_direct_roamer()
@@ -75,3 +75,21 @@ func deselect_roamer():
 	selected_roamer.on_deselected()
 	roamer_ui.hide_roamer()
 	selected_roamer = null
+
+func try_interact_with_trader():
+	var cam = get_camera()
+	if not cam:
+		return
+	var mouse_pos = get_viewport().get_mouse_position()
+	var ray_origin = cam.project_ray_origin(mouse_pos)
+	var ray_end = ray_origin + cam.project_ray_normal(mouse_pos) * 100.0
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	var result = space_state.intersect_ray(query)
+	if result:
+		var node = result.collider
+		while node:
+			if node.name == "Maren":
+				roamer_ui.open_shop(node)
+				return
+			node = node.get_parent()

@@ -39,3 +39,42 @@ text = "💧 Dewdrops: 50"
 [node name="ToolLabel" type="Label" parent="Panel/VBoxContainer" unique_id=294024903]
 layout_mode = 2
 text = "🔧 Tool: Spade"
+
+[node name="ShopPanel" type="PanelContainer" parent="." unique_id=1357719498]
+visible = false
+custom_minimum_size = Vector2(300, 400)
+offset_left = 400.0
+offset_top = 20.0
+offset_right = 440.0
+offset_bottom = 60.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ShopPanel" unique_id=1199696694]
+layout_mode = 2
+
+[node name="ShopTitle" type="Label" parent="ShopPanel/VBoxContainer" unique_id=325159297]
+layout_mode = 2
+text = "Maren's Wares"
+
+[node name="DewdropsLabel" type="Label" parent="ShopPanel/VBoxContainer" unique_id=1469091222]
+layout_mode = 2
+text = "Dewdrops: 50"
+
+[node name="Item0" type="Button" parent="ShopPanel/VBoxContainer" unique_id=2137854133]
+layout_mode = 2
+text = "Berry Seeds — 10💧"
+
+[node name="Item1" type="Button" parent="ShopPanel/VBoxContainer" unique_id=1548504645]
+layout_mode = 2
+text = "Wildgrass Seeds — 5💧"
+
+[node name="Item2" type="Button" parent="ShopPanel/VBoxContainer" unique_id=1366141873]
+layout_mode = 2
+text = "Oak Sapling — 25💧"
+
+[node name="Item3" type="Button" parent="ShopPanel/VBoxContainer" unique_id=418061733]
+layout_mode = 2
+text = "Fresh Berries — 8💧"
+
+[node name="CloseButton" type="Button" parent="ShopPanel/VBoxContainer" unique_id=330086712]
+layout_mode = 2
+text = "Close"

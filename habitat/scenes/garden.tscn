@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://drmbu2mtd3pfq" path="res://scenes/berry_bush.tscn" id="7_wdstj"]
 [ext_resource type="PackedScene" uid="uid://b4hn7obb75dth" path="res://creatures/mossdeer.tscn" id="8_1vq1v"]
 [ext_resource type="PackedScene" uid="uid://bln8w37off4uw" path="res://scenes/tool_manager.tscn" id="9_5pv02"]
+[ext_resource type="PackedScene" uid="uid://bqrg6quaigfo4" path="res://scenes/maren.tscn" id="10_wiw1g"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b0h10"]
 albedo_color = Color(0.2901961, 0.41960785, 0.20784314, 1)
@@ -75,3 +76,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, -10)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 5)
 
 [node name="ToolManager" parent="." unique_id=1171000714 instance=ExtResource("9_5pv02")]
+
+[node name="Maren" parent="." unique_id=1589191564 instance=ExtResource("10_wiw1g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, 0)

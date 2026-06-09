@@ -1,0 +1,53 @@
+[gd_scene format=3 uid="uid://bqrg6quaigfo4"]
+
+[ext_resource type="Script" uid="uid://comabbgqs7ss6" path="res://scripts/maren.gd" id="1_edqfg"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_k3khq"]
+albedo_color = Color(0.54509807, 0.27058825, 0.07450981, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_rcvok"]
+material = SubResource("StandardMaterial3D_k3khq")
+radius = 0.4
+height = 1.6
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ff7oe"]
+albedo_color = Color(0.95686275, 0.78431374, 0.6039216, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_aebvv"]
+material = SubResource("StandardMaterial3D_ff7oe")
+radius = 0.3
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_ce31p"]
+radius = 2.5
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_edqfg"]
+radius = 0.4
+height = 1.6
+
+[node name="Maren" type="Node3D" unique_id=1589191564]
+script = ExtResource("1_edqfg")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=1779817497]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+mesh = SubResource("CapsuleMesh_rcvok")
+
+[node name="Head" type="MeshInstance3D" parent="." unique_id=1872810721]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
+mesh = SubResource("SphereMesh_aebvv")
+
+[node name="NameLabel" type="Label3D" parent="." unique_id=1099924005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.8, 0)
+billboard = 1
+no_depth_test = true
+text = "Maren the Seedkeeper"
+
+[node name="InteractionArea" type="Area3D" parent="." unique_id=313235454]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractionArea" unique_id=1690700016]
+shape = SubResource("SphereShape3D_ce31p")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=650223056]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=1216626653]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("CapsuleShape3D_edqfg")
