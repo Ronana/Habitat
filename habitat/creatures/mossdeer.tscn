@@ -21,7 +21,7 @@ height = 0.8
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_aitnm"]
 height = 1.6
 
-[node name="Mossdeer" type="CharacterBody3D" unique_id=1899289714]
+[node name="Mossdeer" type="CharacterBody3D" unique_id=1899289714 groups=["roamers"]]
 script = ExtResource("1_24iji")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=843322906]
@@ -35,3 +35,9 @@ mesh = SubResource("CylinderMesh_d5wfj")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=385751821]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("CapsuleShape3D_aitnm")
+
+[node name="NameLabel" type="Label3D" parent="." unique_id=979238424]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+billboard = 1
+no_depth_test = true
+text = "Mossdeer"

@@ -24,3 +24,9 @@ mesh = SubResource("CapsuleMesh_3d4a8")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1879991068]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
 shape = SubResource("CapsuleShape3D_p0r7e")
+
+[node name="NameLabel" type="Label3D" parent="." unique_id=184679527]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+billboard = 1
+no_depth_test = true
+text = "GlowFox"
