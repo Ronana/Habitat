@@ -40,6 +40,14 @@ text = "💧 Dewdrops: 50"
 layout_mode = 2
 text = "🔧 Tool: Spade"
 
+[node name="SaveButton" type="Button" parent="Panel/VBoxContainer" unique_id=1813853492]
+layout_mode = 2
+text = "💾 Save"
+
+[node name="LoadButton" type="Button" parent="Panel/VBoxContainer" unique_id=1674007614]
+layout_mode = 2
+text = "📂 Load"
+
 [node name="ShopPanel" type="PanelContainer" parent="." unique_id=1357719498]
 visible = false
 custom_minimum_size = Vector2(300, 400)

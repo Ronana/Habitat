@@ -8,6 +8,20 @@ extends Node3D
 
 func _ready():
 	scatter_trees()
+	
+	# Try to load a save — if none exists start fresh
+	var loaded = SaveManager.load_game(self)
+	if not loaded:
+		print("Fresh wilderness — no save found")
+
+func _input(event):
+	if event is InputEventKey and event.pressed:
+		# Press F5 to save manually
+		if event.keycode == KEY_F5:
+			SaveManager.save_game(self)
+		# Press F9 to load
+		if event.keycode == KEY_F9:
+			SaveManager.load_game(self)
 
 func scatter_trees():
 	var i = 0

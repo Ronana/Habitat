@@ -20,6 +20,8 @@ func _ready():
 	$ShopPanel/VBoxContainer/Item2.pressed.connect(_on_buy_item.bind(2))
 	$ShopPanel/VBoxContainer/Item3.pressed.connect(_on_buy_item.bind(3))
 	$ShopPanel/VBoxContainer/CloseButton.pressed.connect(close_shop)
+	$Panel/VBoxContainer/SaveButton.pressed.connect(_on_save)
+	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)
 
 func _process(_delta):
 	if tracked_roamer:
@@ -59,3 +61,11 @@ func _on_buy_item(index: int):
 	if current_trader:
 		current_trader.buy_item(index)
 		shop_dewdrops.text = "Dewdrops: " + str(snappedf(CurrencyManager.dewdrops, 0.1))
+
+func _on_save():
+	SaveManager.save_game(get_tree().get_root().get_node("Garden"))
+	print("Saved from UI!")
+
+func _on_load():
+	SaveManager.load_game(get_tree().get_root().get_node("Garden"))
+	print("Loaded from UI!")
