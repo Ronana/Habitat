@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://xx6vrleum50s"]
+
+[ext_resource type="Script" uid="uid://dryv4k0vcnhtk" path="res://scripts/player_cursor.gd" id="1_uwxsh"]
+
+[node name="PlayerCursor" type="Node3D" unique_id=2047336941]
+script = ExtResource("1_uwxsh")

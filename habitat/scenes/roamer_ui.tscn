@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://cy1idyk70n5br"]
+
+[ext_resource type="Script" uid="uid://se6uvwo7kmq0" path="res://scripts/roamer_ui.gd" id="1_5rfuv"]
+
+[node name="RoamerUI" type="CanvasLayer" unique_id=1002129976]
+script = ExtResource("1_5rfuv")
+
+[node name="Panel" type="PanelContainer" parent="." unique_id=701083411]
+custom_minimum_size = Vector2(250, 150)
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 60.0
+offset_bottom = 60.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel" unique_id=1652419429]
+layout_mode = 2
+
+[node name="RoamerName" type="Label" parent="Panel/VBoxContainer" unique_id=1629030284]
+layout_mode = 2
+text = "No Roamer Selected"
+
+[node name="StageLabel" type="Label" parent="Panel/VBoxContainer" unique_id=623326879]
+layout_mode = 2
+text = "Stage: -"
+
+[node name="FoodLabel" type="Label" parent="Panel/VBoxContainer" unique_id=32791566]
+layout_mode = 2
+text = "Food:"
+
+[node name="FoodBar" type="ProgressBar" parent="Panel/VBoxContainer" unique_id=1812305274]
+layout_mode = 2
+max_value = 1.0
+value = 0.5

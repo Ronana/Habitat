@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://c017yserk35hg"]
+
+[ext_resource type="Script" uid="uid://fdk1ia8bwlv" path="res://scripts/roamer_base.gd" id="1_13udl"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_je5nc"]
+albedo_color = Color(0.76862746, 0.36078432, 0.101960786, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_3d4a8"]
+material = SubResource("StandardMaterial3D_je5nc")
+radius = 0.4
+height = 1.2
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_p0r7e"]
+radius = 0.4
+height = 1.2
+
+[node name="GlowFox" type="CharacterBody3D" unique_id=1061477021 groups=["roamers"]]
+script = ExtResource("1_13udl")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=194262298]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+mesh = SubResource("CapsuleMesh_3d4a8")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1879991068]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("CapsuleShape3D_p0r7e")

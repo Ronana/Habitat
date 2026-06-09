@@ -1,0 +1,77 @@
+extends Node3D
+
+@onready var roamer_ui = $"../RoamerUI"
+
+var selected_roamer = null
+
+func _input(event):
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			print("Click detected")
+			try_select_roamer()
+		
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			if selected_roamer:
+				try_direct_roamer()
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed and event.double_click:
+			if selected_roamer:
+				selected_roamer.feed(0.3)
+
+func try_direct_roamer():
+	var cam = get_camera()
+	if not cam:
+		return
+	
+	var mouse_pos = get_viewport().get_mouse_position()
+	var ray_origin = cam.project_ray_origin(mouse_pos)
+	var ray_end = ray_origin + cam.project_ray_normal(mouse_pos) * 100.0
+	
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	var result = space_state.intersect_ray(query)
+	
+	if result:
+		var target = result.position
+		selected_roamer.move_to(target)
+		print("Directing to: ", target)
+
+func get_camera():
+	return get_viewport().get_camera_3d()
+
+func try_select_roamer():
+	var cam = get_camera()
+	if not cam:
+		print("No camera found")
+		return
+	print("Camera found: ", cam.name)
+	var mouse_pos = get_viewport().get_mouse_position()
+	var ray_origin = cam.project_ray_origin(mouse_pos)
+	var ray_end = ray_origin + cam.project_ray_normal(mouse_pos) * 100.0
+	
+	var space_state = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	var result = space_state.intersect_ray(query)
+	
+	if result:
+		print("Ray hit: ", result.collider.name)
+		var node = result.collider
+		while node:
+			if node.is_in_group("roamers"):
+				select_roamer(node)
+				return
+			node = node.get_parent()
+	else:
+		print("Ray hit nothing")
+	
+	if selected_roamer:
+		deselect_roamer()
+
+func select_roamer(roamer):
+	selected_roamer = roamer
+	roamer.on_selected()
+	roamer_ui.show_roamer(roamer)
+
+func deselect_roamer():
+	selected_roamer.on_deselected()
+	roamer_ui.hide_roamer()
+	selected_roamer = null

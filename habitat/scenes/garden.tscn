@@ -1,0 +1,65 @@
+[gd_scene format=3 uid="uid://chvucpas7ko6k"]
+
+[ext_resource type="Script" uid="uid://cd3y3yv7x6m5s" path="res://scripts/garden.gd" id="1_4iwim"]
+[ext_resource type="Script" uid="uid://b4pqhdbtba3gi" path="res://scripts/camera_3d.gd" id="1_hltfv"]
+[ext_resource type="PackedScene" uid="uid://dddmp765tiipa" path="res://scenes/tree.tscn" id="2_t3x5t"]
+[ext_resource type="PackedScene" uid="uid://c017yserk35hg" path="res://creatures/glowfox.tscn" id="4_k83q7"]
+[ext_resource type="PackedScene" uid="uid://xx6vrleum50s" path="res://scenes/player_cursor.tscn" id="5_77qwg"]
+[ext_resource type="PackedScene" uid="uid://cy1idyk70n5br" path="res://scenes/roamer_ui.tscn" id="6_o5anx"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b0h10"]
+albedo_color = Color(0.2901961, 0.4862745, 0.24705882, 1)
+roughness = 0.9
+uv1_scale = Vector3(20, 20, 20)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_b0h10"]
+material = SubResource("StandardMaterial3D_b0h10")
+size = Vector2(100, 100)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_k83q7"]
+size = Vector3(200, 0.1, 200)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_hltfv"]
+
+[sub_resource type="Sky" id="Sky_t3x5t"]
+sky_material = SubResource("ProceduralSkyMaterial_hltfv")
+
+[sub_resource type="Environment" id="Environment_4iwim"]
+background_mode = 2
+sky = SubResource("Sky_t3x5t")
+ambient_light_color = Color(0.65882355, 0.76862746, 0.63529414, 1)
+ambient_light_energy = 0.4
+fog_enabled = true
+fog_light_color = Color(0.78431374, 0.84705883, 0.6901961, 1)
+fog_density = 0.002
+
+[node name="Garden" type="Node3D" unique_id=1493046901]
+script = ExtResource("1_4iwim")
+tree_scene = ExtResource("2_t3x5t")
+
+[node name="Ground" type="MeshInstance3D" parent="." unique_id=898570718]
+mesh = SubResource("PlaneMesh_b0h10")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Ground" unique_id=737239762]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground/StaticBody3D" unique_id=1941678162]
+shape = SubResource("BoxShape3D_k83q7")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=978597290]
+transform = Transform3D(0.8660254, 0.35355338, -0.35355338, 0, 0.70710677, 0.70710677, 0.5, -0.6123724, 0.6123724, 0, 0, 0)
+light_energy = 1.5
+
+[node name="MainCamera" type="Camera3D" parent="." unique_id=1952052033]
+transform = Transform3D(1, 0, 0, 0, 0.81915206, 0.57357645, 0, -0.57357645, 0.81915206, 0, 15, 20)
+current = true
+script = ExtResource("1_hltfv")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=787627330]
+environment = SubResource("Environment_4iwim")
+
+[node name="GlowFox" parent="." unique_id=1061477021 instance=ExtResource("4_k83q7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="PlayerCursor" parent="." unique_id=2047336941 instance=ExtResource("5_77qwg")]
+
+[node name="RoamerUI" parent="." unique_id=1002129976 instance=ExtResource("6_o5anx")]
