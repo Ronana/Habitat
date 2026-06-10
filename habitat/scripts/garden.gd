@@ -148,17 +148,28 @@ func create_starter_bumps():
 func scatter_debris():
 	var half = starter_area_size / 2.0
 	var debris_items = [
-		{"colour": Color(0.45, 0.35, 0.25), "scale": Vector3(0.8, 0.4, 0.6)},  # Rock
-		{"colour": Color(0.35, 0.25, 0.15), "scale": Vector3(1.2, 0.3, 0.4)},  # Log
-		{"colour": Color(0.3, 0.28, 0.2), "scale": Vector3(0.5, 0.5, 0.5)},    # Small rock
-		{"colour": Color(0.4, 0.32, 0.22), "scale": Vector3(0.6, 0.35, 0.5)},  # Stone
+		{"name": "Rock", "colour": Color(0.45, 0.35, 0.25), "scale": Vector3(0.8, 0.4, 0.6), "mesh": "box", "reward": 5.0, "xp": 8.0},
+		{"name": "Log", "colour": Color(0.35, 0.25, 0.15), "scale": Vector3(1.2, 0.3, 0.4), "mesh": "box", "reward": 8.0, "xp": 10.0},
+		{"name": "SmallRock", "colour": Color(0.3, 0.28, 0.2), "scale": Vector3(0.5, 0.5, 0.5), "mesh": "sphere", "reward": 3.0, "xp": 5.0},
+		{"name": "Stone", "colour": Color(0.4, 0.32, 0.22), "scale": Vector3(0.6, 0.35, 0.5), "mesh": "sphere", "reward": 4.0, "xp": 6.0},
 	]
 	
 	for j in range(15):
 		var item = debris_items[randi() % debris_items.size()]
-		var mesh_instance = MeshInstance3D.new()
 		
-		if j % 2 == 0:
+		# Root node for the debris item
+		var debris_node = StaticBody3D.new()
+		debris_node.name = item["name"] + "_" + str(j)
+		debris_node.add_to_group("debris")
+		
+		# Store reward data on the node
+		debris_node.set_meta("dewdrop_reward", item["reward"])
+		debris_node.set_meta("xp_reward", item["xp"])
+		debris_node.set_meta("debris_name", item["name"])
+		
+		# Visual mesh
+		var mesh_instance = MeshInstance3D.new()
+		if item["mesh"] == "box":
 			mesh_instance.mesh = BoxMesh.new()
 		else:
 			mesh_instance.mesh = SphereMesh.new()
@@ -167,15 +178,28 @@ func scatter_debris():
 		mat.albedo_color = item["colour"]
 		mat.roughness = 1.0
 		mesh_instance.set_surface_override_material(0, mat)
+		debris_node.add_child(mesh_instance)
 		
+		# Collision shape
+		var collision = CollisionShape3D.new()
+		if item["mesh"] == "box":
+			var box_shape = BoxShape3D.new()
+			box_shape.size = item["scale"]
+			collision.shape = box_shape
+		else:
+			var sphere_shape = SphereShape3D.new()
+			sphere_shape.radius = item["scale"].x * 0.5
+			collision.shape = sphere_shape
+		debris_node.add_child(collision)
+		
+		# Position and transform
 		var x = randf_range(-half + 3, half - 3)
 		var z = randf_range(-half + 3, half - 3)
-		mesh_instance.position = Vector3(x, 0.5, z)
-		mesh_instance.scale = item["scale"]
-		mesh_instance.rotation.y = randf_range(0, TAU)
+		debris_node.position = Vector3(x, 0.3, z)
+		debris_node.scale = item["scale"]
+		debris_node.rotation.y = randf_range(0, TAU)
 		
-		add_child(mesh_instance)
-		mesh_instance.add_to_group("debris")
+		add_child(debris_node)
 		
 		
 func _process(_delta):
