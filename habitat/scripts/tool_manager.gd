@@ -16,6 +16,7 @@ var ground_mesh: MeshInstance3D
 var mesh_data_tool: MeshDataTool
 var array_mesh: ArrayMesh
 var starter_area_size: float = 40.0
+var shelter_scene: PackedScene = preload("res://scenes/shelter.tscn")
 
 func _ready():
 	ground_mesh = get_parent().get_node("Ground")
@@ -34,6 +35,8 @@ func build_mesh_data_tool():
 	)
 	mesh_data_tool = MeshDataTool.new()
 	mesh_data_tool.create_from_surface(array_mesh, 0)
+	update_ground_collision()
+	
 
 func _input(event):
 	if not event is InputEventMouseButton:
@@ -74,7 +77,7 @@ func place_item():
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
 	var result = space_state.intersect_ray(query)
-
+	
 	if result:
 		match placement_item:
 			"Berry Seeds":
@@ -83,6 +86,14 @@ func place_item():
 					get_parent().add_child(bush)
 					bush.global_position = result.position
 					print("Berry bush planted!")
+					placement_item = ""
+			"Basic Shelter":
+				if InventoryManager.remove_item("Basic Shelter"):
+					var shelter = shelter_scene.instantiate()
+					get_parent().add_child(shelter)
+					shelter.global_position = result.position
+					print("Shelter placed!")
+					WardenManager.gain_xp("bush_planted")
 					placement_item = ""
 
 
@@ -138,12 +149,15 @@ func deform_terrain(hit_pos: Vector3):
 	mesh_data_tool.commit_to_surface(array_mesh)
 	ground_mesh.mesh = array_mesh.duplicate()
 	apply_terrain_colours()
+	update_ground_collision()
 	
 func set_placement_item(item_name: String):
 	placement_item = item_name
 	print("Ready to place: ", item_name)
 
 func apply_terrain_colours():
+	
+	
 	var surface_tool = SurfaceTool.new()
 	var mdt = MeshDataTool.new()
 	var temp_mesh = ArrayMesh.new()
@@ -181,3 +195,22 @@ func apply_terrain_colours():
 	mat.vertex_color_use_as_albedo = true
 	mat.roughness = 0.9
 	ground_mesh.set_surface_override_material(0, mat)
+	# NOTE: do not call update_ground_collision() here — deform_terrain() calls
+	# it once after apply_terrain_colours() returns, avoiding a double rebuild.
+
+func update_ground_collision():
+	# Update the shape in-place — no queue_free/await so there's never a
+	# frame gap where ground collision is absent (which causes is_on_floor()
+	# to flicker and roamers to fall through).
+	var static_body = ground_mesh.get_node_or_null("StaticBody3D")
+	if not static_body:
+		static_body = StaticBody3D.new()
+		static_body.name = "StaticBody3D"
+		ground_mesh.add_child(static_body)
+
+	var collision_shape = static_body.get_node_or_null("CollisionShape3D")
+	if not collision_shape:
+		collision_shape = CollisionShape3D.new()
+		static_body.add_child(collision_shape)
+
+	collision_shape.shape = ground_mesh.mesh.create_trimesh_shape()

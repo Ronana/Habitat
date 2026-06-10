@@ -42,30 +42,48 @@ func get_camera():
 func try_select_roamer():
 	var cam = get_camera()
 	if not cam:
-		print("No camera found")
 		return
-	print("Camera found: ", cam.name)
 	var mouse_pos = get_viewport().get_mouse_position()
 	var ray_origin = cam.project_ray_origin(mouse_pos)
 	var ray_end = ray_origin + cam.project_ray_normal(mouse_pos) * 100.0
-	
 	var space_state = get_world_3d().direct_space_state
 	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
 	var result = space_state.intersect_ray(query)
-	
+
 	if result:
-		print("Ray hit: ", result.collider.name)
 		var node = result.collider
 		while node:
 			if node.is_in_group("roamers"):
-				select_roamer(node)
+				if node == selected_roamer:
+					# Clicking the selected roamer again deselects it
+					deselect_roamer()
+				elif selected_roamer and _can_breed(selected_roamer, node):
+					# Second click on a breed-eligible roamer — initiate bond
+					_initiate_breed(selected_roamer, node)
+				else:
+					# Switch selection (or first selection)
+					if selected_roamer:
+						deselect_roamer()
+					select_roamer(node)
 				return
 			node = node.get_parent()
-	else:
-		print("Ray hit nothing")
-	
+
 	if selected_roamer:
 		deselect_roamer()
+
+func _can_breed(a, b) -> bool:
+	if not a.is_bondable() or not b.is_bondable():
+		return false
+	if a.species_id == "" or a.species_id != b.species_id:
+		return false
+	if a._is_sibling(b):
+		return false
+	return true
+
+func _initiate_breed(a, b):
+	print(a.name, " + ", b.name, " — breeding initiated!")
+	deselect_roamer()
+	a.start_bond(b)
 
 func select_roamer(roamer):
 	selected_roamer = roamer

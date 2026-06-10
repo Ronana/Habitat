@@ -1,14 +1,12 @@
 extends "res://scripts/roamer_base.gd"
 
 func _ready():
-	# Mossdeer specific stats
+	species_id = "Mossdeer"
+	creature_scene_path = "res://creatures/mossdeer.tscn"
 	move_speed = 1.8
 	dewdrop_interval = 7.0
 	hunger_threshold = 0.5
-	
-	# Mossdeer needs more food than a fox
 	need_decay["food"] = 0.015
-	
 	super._ready()
 
 func on_selected():

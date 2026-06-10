@@ -38,6 +38,7 @@ func _ready():
 	$Panel/VBoxContainer/SaveButton.pressed.connect(_on_save)
 	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)
 	$Panel/VBoxContainer/JournalButton.pressed.connect(_on_journal_button)
+	$ShopPanel/VBoxContainer/Item4.pressed.connect(_on_buy_item.bind(4))
 	print("SeasonLabel found: ", has_node("Panel/VBoxContainer/SeasonLabel"))
 	
 	

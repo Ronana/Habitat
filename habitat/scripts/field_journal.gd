@@ -4,8 +4,10 @@ extends CanvasLayer
 @onready var roamer_list = $JournalPanel/HBoxContainer/LeftPanel/ScrollContainer/RoamerList
 @onready var entry_name = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/EntryName
 @onready var entry_stage = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/EntryStage
+@onready var stage_hint = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/StageHint
 @onready var entry_happiness = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/EntryHappiness
 @onready var needs_detail = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/NeedsDetail
+@onready var family_detail = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/FamilyDetail
 @onready var discovery_detail = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/DiscoveryDetail
 @onready var tips_detail = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/TipsDetail
 @onready var close_button = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/CloseButton
@@ -75,9 +77,9 @@ func refresh_journal():
 		return
 
 	for roamer in roamers:
-		discover_roamer(roamer.name)
+		var display_name = roamer.name
 		var btn = Button.new()
-		btn.text = roamer.name
+		btn.text = display_name
 		btn.custom_minimum_size = Vector2(200, 40)
 		btn.pressed.connect(_on_roamer_selected.bind(roamer))
 		roamer_list.add_child(btn)
@@ -89,7 +91,13 @@ func _on_roamer_selected(roamer):
 	var stage_names = ["Appears", "Visits", "Resident", "Bonded"]
 	entry_name.text = "🦊 " + roamer.name
 	entry_stage.text = "Stage: " + stage_names[roamer.attraction_stage]
-	entry_happiness.text = "Happiness: " + str(int(roamer.happiness * 100)) + "%"
+	stage_hint.text = _get_stage_hint(roamer)
+
+	# Show shelter status
+	if roamer.has_shelter:
+		entry_happiness.text = "Happiness: " + str(int(roamer.happiness * 100)) + "% 🏠"
+	else:
+		entry_happiness.text = "Happiness: " + str(int(roamer.happiness * 100)) + "% (Needs shelter)"
 
 	# Build needs string
 	var needs_text = ""
@@ -98,17 +106,70 @@ func _on_roamer_selected(roamer):
 		needs_text += need.capitalize() + ": " + bar + " " + str(int(roamer.needs[need] * 100)) + "%\n"
 	needs_detail.text = needs_text
 
-	# Discovery notes
-	if roamer_discovery_notes.has(roamer.name):
-		discovery_detail.text = roamer_discovery_notes[roamer.name]
+	family_detail.text = _get_family_text(roamer)
+
+	# Discovery notes — use species_id for lookup, fall back to name
+	var lookup_key = roamer.species_id if roamer.species_id != "" else roamer.name
+	if roamer_discovery_notes.has(lookup_key):
+		discovery_detail.text = roamer_discovery_notes[lookup_key]
 	else:
 		discovery_detail.text = "Still learning about this creature..."
 
 	# Warden tips
-	if roamer_tips.has(roamer.name):
-		tips_detail.text = roamer_tips[roamer.name]
+	if roamer_tips.has(lookup_key):
+		tips_detail.text = roamer_tips[lookup_key]
 	else:
 		tips_detail.text = "Keep observing to learn more."
+
+func _get_stage_hint(roamer) -> String:
+	match roamer.attraction_stage:
+		0: # APPEARS
+			var pct = int(roamer.happiness * 100)
+			return "→ Reach 50% happiness to progress  (currently " + str(pct) + "%)"
+		1: # VISITS
+			var pct = int(roamer.happiness * 100)
+			if not roamer.has_shelter:
+				return "→ Place a shelter and reach 70% happiness to become Resident  (currently " + str(pct) + "%, no shelter)"
+			else:
+				return "→ Reach 70% happiness to become Resident  (currently " + str(pct) + "%)"
+		2: # RESIDENT
+			if not roamer.is_adult:
+				return "→ Still growing up — must be an adult to become Bonded"
+			var pct = int(roamer.happiness * 100)
+			return "→ Reach 90% happiness to become Bonded  (currently " + str(pct) + "%)"
+		3: # BONDED
+			return "✓ Fully bonded — ready to breed!"
+	return ""
+
+func _get_family_text(roamer) -> String:
+	var lines = []
+
+	if roamer.is_adult:
+		lines.append("Adult")
+	else:
+		var pct = int((roamer.grow_up_timer / roamer.grow_up_time) * 100)
+		lines.append("Child (" + str(pct) + "% grown)")
+
+	if roamer.family_id != "":
+		lines.append("Family ID: " + roamer.family_id.left(12) + "…")
+
+	if roamer.parent_a_id != "" or roamer.parent_b_id != "":
+		var parent_names = []
+		for r in get_tree().get_nodes_in_group("roamers"):
+			if str(r.get_instance_id()) == roamer.parent_a_id or \
+			   str(r.get_instance_id()) == roamer.parent_b_id:
+				parent_names.append(r.name)
+		if parent_names.size() > 0:
+			lines.append("Parents: " + ", ".join(parent_names))
+		else:
+			lines.append("Parents: (no longer in garden)")
+
+	if roamer.is_breeding:
+		lines.append("Currently breeding ♥")
+
+	if lines.is_empty():
+		return ""
+	return "\n".join(lines)
 
 func _make_bar(value: float) -> String:
 	var filled = int(value * 10)

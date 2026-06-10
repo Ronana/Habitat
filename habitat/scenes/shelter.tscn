@@ -1,0 +1,59 @@
+[gd_scene format=3 uid="uid://bx127eu8o7tax"]
+
+[ext_resource type="Script" uid="uid://cd7aopwwcrix" path="res://scripts/shelter.gd" id="1_en2vt"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_38xmi"]
+albedo_color = Color(0.36078432, 0.23921569, 0.11764706, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_8bbkk"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i3m7q"]
+albedo_color = Color(0.1764706, 0.3529412, 0.11764706, 1)
+
+[sub_resource type="PrismMesh" id="PrismMesh_osqu4"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_u3ehf"]
+albedo_color = Color(0.54509807, 0.3882353, 0.2509804, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_s84e0"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ejcbl"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wfvgn"]
+
+[node name="Shelter" type="Node3D" unique_id=980019052]
+script = ExtResource("1_en2vt")
+
+[node name="Base" type="MeshInstance3D" parent="." unique_id=833495579]
+transform = Transform3D(2, 0, 0, 0, 0.3, 0, 0, 0, 2, 0, 0.15, 0)
+material_overlay = SubResource("StandardMaterial3D_38xmi")
+mesh = SubResource("BoxMesh_8bbkk")
+
+[node name="Roof" type="MeshInstance3D" parent="." unique_id=931921346]
+transform = Transform3D(2.2, 0, 0, 0, 1.2, 0, 0, 0, 2.2, 0, 1.8, 0)
+material_overlay = SubResource("StandardMaterial3D_i3m7q")
+mesh = SubResource("PrismMesh_osqu4")
+
+[node name="Walls" type="MeshInstance3D" parent="." unique_id=1407322878]
+transform = Transform3D(2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0.8, 0)
+material_overlay = SubResource("StandardMaterial3D_u3ehf")
+mesh = SubResource("BoxMesh_s84e0")
+
+[node name="ShelterLabel" type="Label3D" parent="." unique_id=1675723569]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.8, 0)
+billboard = 1
+no_depth_test = true
+text = "Shelter"
+font_size = 28
+
+[node name="ShelterArea" type="Area3D" parent="." unique_id=1003944528]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShelterArea" unique_id=1989721368]
+transform = Transform3D(3, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0)
+shape = SubResource("BoxShape3D_ejcbl")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=1185035902]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=1778917925]
+transform = Transform3D(2, 0, 0, 0, 1.5, 0, 0, 0, 2, 0, 0.75, 0)
+shape = SubResource("BoxShape3D_wfvgn")

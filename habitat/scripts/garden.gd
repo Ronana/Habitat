@@ -8,11 +8,15 @@ extends Node3D
 @export var starter_area_size: float = 40.0
 var base_ground_level: float = 0.0
 
+var berry_bush_scene: PackedScene = preload("res://scenes/berry_bush.tscn")
+
 func _ready():
 	scatter_trees()
 	create_boundary()
 	create_starter_bumps()
 	scatter_debris()
+	plant_starting_bushes()
+	give_starting_inventory()
 	# Connect day night manager to scene lights
 	var sun = get_node("DirectionalLight3D")
 	var env = get_node("WorldEnvironment").environment
@@ -137,12 +141,22 @@ func create_starter_bumps():
 	var mat = ground_node.get_active_material(0)
 	if mat:
 		ground_node.set_surface_override_material(0, mat)
-		
+
 	# Restore material after mesh rebuild
 	var ground_mat = StandardMaterial3D.new()
 	ground_mat.albedo_color = Color(0.29, 0.36, 0.18)
 	ground_mat.roughness = 0.9
 	ground_node.set_surface_override_material(0, ground_mat)
+
+	# Rebuild collision immediately from the bumped mesh so it's valid before
+	# the first physics tick. tool_manager awaits 2 frames before rebuilding,
+	# but _physics_process() fires in frame 1 — without this, roamers fall
+	# through the empty ConcavePolygonShape3D that the scene starts with.
+	var static_body = ground_node.get_node_or_null("StaticBody3D")
+	if static_body:
+		var col = static_body.get_node_or_null("CollisionShape3D")
+		if col:
+			col.shape = ground_node.mesh.create_trimesh_shape()
 	
 
 func scatter_debris():
@@ -195,13 +209,35 @@ func scatter_debris():
 		# Position and transform
 		var x = randf_range(-half + 3, half - 3)
 		var z = randf_range(-half + 3, half - 3)
+# Position and transform — apply scale to mesh only not the body
 		debris_node.position = Vector3(x, 0.3, z)
-		debris_node.scale = item["scale"]
 		debris_node.rotation.y = randf_range(0, TAU)
+		mesh_instance.scale = item["scale"]
 		
 		add_child(debris_node)
 		
 		
+func plant_starting_bushes():
+	# Three bushes spread around the starter area so roamers have immediate food.
+	# Raycast down to terrain surface so each bush sits at the right height.
+	var positions = [
+		Vector3(5.0, 10.0, 3.0),
+		Vector3(-6.0, 10.0, 5.0),
+		Vector3(3.0, 10.0, -7.0),
+	]
+	var space_state = get_world_3d().direct_space_state
+	for pos in positions:
+		var query = PhysicsRayQueryParameters3D.create(pos, pos + Vector3(0, -15, 0))
+		var result = space_state.intersect_ray(query)
+		var plant_y = result.position.y if result else 1.0
+		var bush = berry_bush_scene.instantiate()
+		add_child(bush)
+		bush.global_position = Vector3(pos.x, plant_y, pos.z)
+
+func give_starting_inventory():
+	InventoryManager.add_item("Berry Seeds", 5)
+	InventoryManager.add_item("Basic Shelter", 2)
+
 func _process(_delta):
 	update_boundary_heights()
 

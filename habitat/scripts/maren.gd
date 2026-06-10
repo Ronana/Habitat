@@ -5,6 +5,7 @@ var shop_items = [
 	{"name": "Wildgrass Seeds", "cost": 5.0, "description": "Spreads ground cover. Attracts grazing Roamers."},
 	{"name": "Oak Sapling", "cost": 25.0, "description": "Grows into a large oak. Woodland Roamers love these."},
 	{"name": "Fresh Berries", "cost": 8.0, "description": "Feed directly to a Roamer to boost food need."},
+	{"name": "Basic Shelter", "cost": 30.0, "description": "A cosy home for a Roamer. Place it in your wilderness."},
 ]
 
 var is_shop_open = false
@@ -45,3 +46,5 @@ func apply_purchase(item_name: String):
 			InventoryManager.add_item("Oak Sapling")
 		"Fresh Berries":
 			InventoryManager.add_item("Fresh Berries")
+		"Basic Shelter":
+			InventoryManager.add_item("Basic Shelter")

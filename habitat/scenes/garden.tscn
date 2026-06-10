@@ -23,8 +23,7 @@ size = Vector2(200, 200)
 subdivide_width = 50
 subdivide_depth = 50
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_k83q7"]
-size = Vector3(200, 0.1, 200)
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_dfwg7"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_hltfv"]
 
@@ -69,7 +68,7 @@ mesh = SubResource("PlaneMesh_b0h10")
 [node name="StaticBody3D" type="StaticBody3D" parent="Ground" unique_id=737239762]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground/StaticBody3D" unique_id=1941678162]
-shape = SubResource("BoxShape3D_k83q7")
+shape = SubResource("ConcavePolygonShape3D_dfwg7")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=978597290]
 transform = Transform3D(0.8660254, 0.40957603, -0.28678823, 0, 0.57357645, 0.81915206, 0.5, -0.7094065, 0.49673176, 0, 4.8102603, 0)
@@ -84,10 +83,13 @@ script = ExtResource("1_hltfv")
 environment = SubResource("Environment_4iwim")
 
 [node name="GlowFox" parent="." unique_id=1061477021 instance=ExtResource("4_k83q7")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+
+[node name="GlowFox2" parent="." unique_id=1061477022 instance=ExtResource("4_k83q7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 3, 3)
 
 [node name="Mossdeer" parent="." unique_id=1899289714 instance=ExtResource("8_1vq1v")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, -10)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 3, -10)
 
 [node name="PlayerCursor" parent="." unique_id=2047336941 instance=ExtResource("5_77qwg")]
 

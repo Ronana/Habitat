@@ -53,6 +53,19 @@ func save_game(_garden: Node):
 				"z": bush.global_position.z
 			}
 		})
+		
+	# Save shelters
+	save_data["shelters"] = []
+	for shelter in get_tree().get_nodes_in_group("shelters"):
+		save_data["shelters"].append({
+			"position": {
+				"x": shelter.global_position.x,
+				"y": shelter.global_position.y,
+				"z": shelter.global_position.z
+			},
+			"occupied": shelter.is_occupied,
+			"assigned_roamer": shelter.assigned_roamer.name if shelter.assigned_roamer else ""
+		})
 	
 	# Write to file
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -148,6 +161,18 @@ func load_game(_garden: Node):
 			bush_data["position"]["y"],
 			bush_data["position"]["z"]
 		)
+		
+	# Restore shelters
+	if save_data.has("shelters"):
+		var shelter_scene = load("res://scenes/shelter.tscn")
+		for shelter_data in save_data["shelters"]:
+			var shelter = shelter_scene.instantiate()
+			_garden.add_child(shelter)
+			shelter.global_position = Vector3(
+				shelter_data["position"]["x"],
+				shelter_data["position"]["y"],
+				shelter_data["position"]["z"]
+			)
 	
 	print("Game loaded successfully!")
 	return true

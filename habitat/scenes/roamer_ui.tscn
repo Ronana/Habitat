@@ -99,6 +99,10 @@ text = "Oak Sapling — 25💧"
 layout_mode = 2
 text = "Fresh Berries — 8💧"
 
+[node name="Item4" type="Button" parent="ShopPanel/VBoxContainer" unique_id=870549250]
+layout_mode = 2
+text = "Basic Shelter — 30💧"
+
 [node name="CloseButton" type="Button" parent="ShopPanel/VBoxContainer" unique_id=330086712]
 layout_mode = 2
 text = "Close"
