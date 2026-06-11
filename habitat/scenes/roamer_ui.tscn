@@ -40,14 +40,6 @@ text = "💧 Dewdrops: 50"
 layout_mode = 2
 text = "🔧 Tool: Spade"
 
-[node name="SaveButton" type="Button" parent="Panel/VBoxContainer" unique_id=1813853492]
-layout_mode = 2
-text = "💾 Save"
-
-[node name="LoadButton" type="Button" parent="Panel/VBoxContainer" unique_id=1674007614]
-layout_mode = 2
-text = "📂 Load"
-
 [node name="ClockLabel" type="Label" parent="Panel/VBoxContainer" unique_id=1438484049]
 layout_mode = 2
 text = "🕐 08:00"
@@ -59,6 +51,10 @@ text = "☀️ Sunny"
 [node name="JournalButton" type="Button" parent="Panel/VBoxContainer" unique_id=1637680919]
 layout_mode = 2
 text = "📖 Journal (J)"
+
+[node name="QuestsButton" type="Button" parent="Panel/VBoxContainer" unique_id=1637680920]
+layout_mode = 2
+text = "📋 Quests"
 
 [node name="SeasonLabel" type="Label" parent="Panel/VBoxContainer" unique_id=465804813]
 layout_mode = 2

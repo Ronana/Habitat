@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/mushroom_cluster.gd" id="1_mc"]
+
+[node name="MushroomCluster" type="Node3D"]
+script = ExtResource("1_mc")

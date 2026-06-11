@@ -22,6 +22,21 @@ var tracked_roamer = null
 var current_trader = null
 var _attraction_hint_timer: float = 0.0
 
+# Quest board
+var _quest_panel: PanelContainer = null
+var _quest_rows: Array = []
+
+# Selected roamer info panel (built entirely in code)
+var _info_panel: PanelContainer = null
+var _info_name_lbl: Label = null
+var _info_sub_lbl: Label = null
+var _info_happiness_bar: ProgressBar = null
+var _info_food_bar: ProgressBar = null
+var _info_safety_bar: ProgressBar = null
+var _info_space_bar: ProgressBar = null
+var _info_den_lbl: Label = null
+var _info_traits_lbl: Label = null
+
 func _ready():
 	CurrencyManager.dewdrops_changed.connect(_on_dewdrops_changed)
 	update_currency()
@@ -35,10 +50,14 @@ func _ready():
 	SeasonManager.day_passed.connect(_on_day_passed)
 	update_season_ui()
 	$ShopPanel/VBoxContainer/CloseButton.pressed.connect(close_shop)
-	$Panel/VBoxContainer/SaveButton.pressed.connect(_on_save)
-	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)
 	$Panel/VBoxContainer/JournalButton.pressed.connect(_on_journal_button)
+	$Panel/VBoxContainer/QuestsButton.pressed.connect(_on_quests_button)
 	_apply_theme()
+	_build_roamer_info_panel()
+	_build_quest_panel()
+	MilestoneManager.milestone_achieved.connect(_on_milestone_achieved)
+	ObjectiveManager.objectives_updated.connect(_refresh_quest_panel)
+	ObjectiveManager.objective_completed.connect(_on_objective_completed)
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
 const C_BG        := Color(0.07, 0.11, 0.07, 0.90)
@@ -121,9 +140,8 @@ func _apply_theme():
 	_style_bar(food_bar, Color(0.90, 0.65, 0.20, 1.0))
 
 	# Main panel buttons
-	_style_button($Panel/VBoxContainer/SaveButton)
-	_style_button($Panel/VBoxContainer/LoadButton)
 	_style_button($Panel/VBoxContainer/JournalButton)
+	_style_button($Panel/VBoxContainer/QuestsButton)
 
 	# ── Shop panel ─────────────────────────────────────────────────────────────
 	_style_label($ShopPanel/VBoxContainer/ShopTitle, 16, C_ACCENT)
@@ -142,6 +160,158 @@ func _apply_theme():
 	_style_bar(xp_bar, Color(0.45, 0.80, 0.28, 1.0))
 	
 	
+
+# ── Selected roamer info panel ────────────────────────────────────────────────
+func _build_roamer_info_panel():
+	_info_panel = PanelContainer.new()
+	_info_panel.add_theme_stylebox_override("panel", _make_panel_style())
+	_info_panel.custom_minimum_size = Vector2(240, 0)
+	# Anchor to right side, vertically centred
+	_info_panel.anchor_left   = 1.0
+	_info_panel.anchor_right  = 1.0
+	_info_panel.anchor_top    = 0.5
+	_info_panel.anchor_bottom = 0.5
+	_info_panel.offset_left   = -260.0
+	_info_panel.offset_right  = -20.0
+	_info_panel.offset_top    = -180.0
+	_info_panel.offset_bottom =  180.0
+	_info_panel.visible = false
+	add_child(_info_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 5)
+	_info_panel.add_child(vbox)
+
+	_info_name_lbl = Label.new()
+	_info_name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_info_name_lbl.add_theme_font_size_override("font_size", 16)
+	_info_name_lbl.add_theme_color_override("font_color", C_ACCENT)
+	vbox.add_child(_info_name_lbl)
+
+	_info_sub_lbl = Label.new()
+	_info_sub_lbl.add_theme_font_size_override("font_size", 11)
+	_info_sub_lbl.add_theme_color_override("font_color", C_MUTED)
+	vbox.add_child(_info_sub_lbl)
+
+	# Traits row
+	_info_traits_lbl = Label.new()
+	_info_traits_lbl.add_theme_font_size_override("font_size", 11)
+	_info_traits_lbl.add_theme_color_override("font_color", Color(0.80, 0.90, 0.65, 1.0))
+	_info_traits_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_info_traits_lbl.custom_minimum_size = Vector2(210, 0)
+	vbox.add_child(_info_traits_lbl)
+
+	vbox.add_child(HSeparator.new())
+
+	# Helper to add a labelled progress bar
+	for cfg in [
+		["♥  Happiness", "h"],
+		["🍃  Food",     "f"],
+		["🛡  Safety",   "s"],
+		["↔  Space",    "sp"]
+	]:
+		var lbl := Label.new()
+		lbl.text = cfg[0]
+		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.add_theme_color_override("font_color", C_TEXT)
+		vbox.add_child(lbl)
+		var bar := ProgressBar.new()
+		bar.max_value = 1.0
+		bar.custom_minimum_size = Vector2(0, 12)
+		bar.add_theme_color_override("font_color", Color(0, 0, 0, 0))
+		vbox.add_child(bar)
+		match cfg[1]:
+			"h":  _info_happiness_bar = bar
+			"f":  _info_food_bar      = bar
+			"s":  _info_safety_bar    = bar
+			"sp": _info_space_bar     = bar
+
+	_style_bar(_info_happiness_bar, Color(0.35, 0.80, 0.35))
+	_style_bar(_info_food_bar,      Color(0.90, 0.65, 0.20))
+	_style_bar(_info_safety_bar,    Color(0.30, 0.60, 0.90))
+	_style_bar(_info_space_bar,     Color(0.75, 0.45, 0.85))
+
+	vbox.add_child(HSeparator.new())
+
+	_info_den_lbl = Label.new()
+	_info_den_lbl.add_theme_font_size_override("font_size", 11)
+	_info_den_lbl.add_theme_color_override("font_color", C_MUTED)
+	vbox.add_child(_info_den_lbl)
+
+func _update_info_panel():
+	if not tracked_roamer or not _info_panel:
+		return
+	var stage_names := ["Appears", "Visits", "Resident", "Bonded"]
+	_info_name_lbl.text = tracked_roamer.roamer_name if tracked_roamer.roamer_name != "" else tracked_roamer.name
+	_info_sub_lbl.text  = tracked_roamer.species_id + "  ·  " + stage_names[tracked_roamer.attraction_stage]
+	if _info_traits_lbl:
+		_info_traits_lbl.text = tracked_roamer.get_traits_display() if tracked_roamer.has_method("get_traits_display") else ""
+
+	var h: float = tracked_roamer.happiness
+	_info_happiness_bar.value = h
+	_info_food_bar.value      = tracked_roamer.needs.get("food",   0.0)
+	_info_safety_bar.value    = tracked_roamer.needs.get("safety", 0.0)
+	_info_space_bar.value     = tracked_roamer.needs.get("space",  0.0)
+
+	# Recolour happiness bar: green → yellow → red
+	var h_col: Color
+	if h > 0.6:
+		h_col = Color(0.35, 0.80, 0.35)
+	elif h > 0.3:
+		h_col = Color(0.85, 0.75, 0.10)
+	else:
+		h_col = Color(0.85, 0.25, 0.15)
+	_style_bar(_info_happiness_bar, h_col)
+
+	# Den status
+	if tracked_roamer.has_shelter and is_instance_valid(tracked_roamer.shelter_node):
+		var den = tracked_roamer.shelter_node
+		_info_den_lbl.text = "🏠 " + den.get_display_name()
+	else:
+		_info_den_lbl.text = "🏠 No den yet"
+
+# ── Milestone popup ───────────────────────────────────────────────────────────
+func _on_milestone_achieved(title: String, subtitle: String):
+	var popup := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.10, 0.06, 0.96)
+	style.border_color = Color(0.95, 0.80, 0.30)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(18)
+	popup.add_theme_stylebox_override("panel", style)
+	popup.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	popup.offset_top = 80.0
+	popup.offset_bottom = 80.0
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 6)
+	popup.add_child(vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = title
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 20)
+	title_lbl.add_theme_color_override("font_color", Color(0.95, 0.80, 0.30))
+	vbox.add_child(title_lbl)
+
+	var sub_lbl := Label.new()
+	sub_lbl.text = subtitle
+	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub_lbl.custom_minimum_size = Vector2(280, 0)
+	sub_lbl.add_theme_font_size_override("font_size", 12)
+	sub_lbl.add_theme_color_override("font_color", C_TEXT)
+	vbox.add_child(sub_lbl)
+
+	add_child(popup)
+	popup.modulate = Color(1, 1, 1, 0)
+	var tween := create_tween()
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 1), 0.4)
+	tween.tween_interval(3.0)
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 0), 0.6)
+	tween.tween_callback(popup.queue_free)
 
 func _process(delta):
 	if tracked_roamer:
@@ -167,17 +337,23 @@ func _update_attraction_hints():
 func show_roamer(roamer):
 	tracked_roamer = roamer
 	roamer_name.text = roamer.name
+	if _info_panel:
+		_info_panel.visible = true
+	_update_info_panel()
 
 func hide_roamer():
 	tracked_roamer = null
 	roamer_name.text = "No Roamer Selected"
 	stage_label.text = "Stage: —"
 	food_bar.value = 0.0
+	if _info_panel:
+		_info_panel.visible = false
 
 func update_ui():
 	var stage_names = ["Appears", "Visits", "Resident", "Bonded"]
 	stage_label.text = "Stage: " + stage_names[tracked_roamer.attraction_stage]
 	food_bar.value = tracked_roamer.needs["food"]
+	_update_info_panel()
 
 func _on_dewdrops_changed(_amount):
 	update_currency()
@@ -257,14 +433,6 @@ func _show_shop_feedback(msg: String, colour: Color):
 	shop_feedback.modulate = colour
 	await get_tree().create_timer(2.5).timeout
 	shop_feedback.text = ""
-
-func _on_save():
-	SaveManager.save_game(get_tree().get_root().get_node("Garden"))
-	print("Saved from UI!")
-
-func _on_load():
-	SaveManager.load_game(get_tree().get_root().get_node("Garden"))
-	print("Loaded from UI!")
 
 func update_inventory_ui():
 	# Clear existing items
@@ -393,6 +561,81 @@ func show_level_up_message():
 func _on_journal_button():
 	var journal = get_tree().get_root().get_node("Garden/FieldJournal")
 	journal.toggle_journal()
+
+func _on_quests_button():
+	if _quest_panel:
+		_quest_panel.visible = not _quest_panel.visible
+
+# ── Quest board ────────────────────────────────────────────────────────────────
+
+func _build_quest_panel():
+	_quest_panel = PanelContainer.new()
+	_quest_panel.add_theme_stylebox_override("panel", _make_panel_style())
+	_quest_panel.custom_minimum_size = Vector2(280, 0)
+	_quest_panel.anchor_left   = 0.0
+	_quest_panel.anchor_right  = 0.0
+	_quest_panel.anchor_top    = 0.0
+	_quest_panel.anchor_bottom = 0.0
+	_quest_panel.offset_left   = 20.0
+	_quest_panel.offset_top    = 420.0
+	_quest_panel.offset_right  = 300.0
+	_quest_panel.offset_bottom = 700.0
+	_quest_panel.visible = false
+	add_child(_quest_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_quest_panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "📋  Maren's Requests"
+	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_color_override("font_color", C_ACCENT)
+	vbox.add_child(title)
+
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+
+	_quest_rows.clear()
+	for i in range(ObjectiveManager.MAX_ACTIVE):
+		var row_box := VBoxContainer.new()
+		row_box.add_theme_constant_override("separation", 2)
+		vbox.add_child(row_box)
+
+		var desc_lbl := Label.new()
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_lbl.custom_minimum_size = Vector2(250, 0)
+		desc_lbl.add_theme_font_size_override("font_size", 12)
+		desc_lbl.add_theme_color_override("font_color", C_TEXT)
+		row_box.add_child(desc_lbl)
+
+		var reward_lbl := Label.new()
+		reward_lbl.add_theme_font_size_override("font_size", 10)
+		reward_lbl.add_theme_color_override("font_color", Color(0.55, 0.85, 1.0))
+		row_box.add_child(reward_lbl)
+
+		_quest_rows.append({"desc": desc_lbl, "reward": reward_lbl, "box": row_box})
+
+		if i < ObjectiveManager.MAX_ACTIVE - 1:
+			vbox.add_child(HSeparator.new())
+
+	_refresh_quest_panel()
+
+func _refresh_quest_panel():
+	for i in range(_quest_rows.size()):
+		var row = _quest_rows[i]
+		if i < ObjectiveManager.active_objectives.size():
+			var obj: Dictionary = ObjectiveManager.active_objectives[i]
+			row["desc"].text   = "• " + obj.get("desc", "")
+			row["reward"].text = "Reward: " + str(obj.get("reward", 0)) + " 💧"
+			row["box"].visible = true
+		else:
+			row["box"].visible = false
+
+func _on_objective_completed(obj: Dictionary):
+	var reward_text := "+ " + str(obj.get("reward", 0)) + " 💧  Quest complete!"
+	_on_milestone_achieved("✓ Quest Complete!", obj.get("desc", "") + "\n" + reward_text)
+	_refresh_quest_panel()
 
 func _on_season_changed(_season):
 	update_season_ui()

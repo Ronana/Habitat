@@ -15,6 +15,10 @@ extends CanvasLayer
 # Journal data — stores discovered roamer info
 var journal_entries = {}
 
+# Currently viewed roamer (for rename)
+var _journal_roamer = null
+var _rename_input: LineEdit = null
+
 # Roamer tips database
 var roamer_tips = {
 	"GlowFox": "Glowfoxes are drawn to warmth and berry bushes. Plant berries nearby and they will visit more readily. They are most active at dusk when their fur begins to glow.",
@@ -32,6 +36,7 @@ func _ready():
 	close_button.pressed.connect(close_journal)
 	journal_panel.visible = false
 	_apply_theme()
+	_build_rename_row()
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
 const C_BG       := Color(0.07, 0.11, 0.07, 0.95)
@@ -118,6 +123,44 @@ func _apply_theme():
 	_style_btn(close_button)
 	close_button.custom_minimum_size = Vector2(200, 36)
 
+func _build_rename_row():
+	var vbox = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+
+	var lbl := Label.new()
+	lbl.text = "Rename:"
+	_style_lbl(lbl, 12, C_MUTED)
+	row.add_child(lbl)
+
+	_rename_input = LineEdit.new()
+	_rename_input.placeholder_text = "Enter name…"
+	_rename_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_rename_input.custom_minimum_size = Vector2(200, 32)
+	row.add_child(_rename_input)
+
+	var btn := Button.new()
+	btn.text = "✏ Rename"
+	btn.pressed.connect(_confirm_rename)
+	_rename_input.text_submitted.connect(func(_t): _confirm_rename())
+	_style_btn(btn, true)
+	row.add_child(btn)
+
+	vbox.add_child(row)
+	# Place the rename row right below EntryName (index 0 → insert at 1)
+	vbox.move_child(row, 1)
+
+func _confirm_rename():
+	if not is_instance_valid(_journal_roamer):
+		return
+	var new_name := _rename_input.text.strip_edges()
+	if new_name.is_empty():
+		return
+	_journal_roamer.set_roamer_name(new_name)
+	ObjectiveManager.record_rename()
+	entry_name.text = "🦊 " + new_name
+	refresh_journal()
+
 func _input(event):
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_J:
@@ -167,7 +210,8 @@ func refresh_journal():
 	for roamer in roamers:
 		var btn = Button.new()
 		var stage_icons = ["👀", "🚶", "🏠", "💚"]
-		btn.text = stage_icons[roamer.attraction_stage] + " " + roamer.name
+		var display_name: String = roamer.roamer_name if roamer.roamer_name != "" else roamer.name
+		btn.text = stage_icons[roamer.attraction_stage] + " " + display_name
 		btn.custom_minimum_size = Vector2(200, 40)
 		btn.pressed.connect(_on_roamer_selected.bind(roamer))
 		_style_btn(btn)
@@ -176,8 +220,12 @@ func refresh_journal():
 	
 
 func _on_roamer_selected(roamer):
+	_journal_roamer = roamer
 	var stage_names = ["Appears", "Visits", "Resident", "Bonded"]
-	entry_name.text = "🦊 " + roamer.name
+	var display: String = roamer.roamer_name if roamer.roamer_name != "" else roamer.name
+	entry_name.text = "🦊 " + display
+	if _rename_input:
+		_rename_input.text = roamer.roamer_name
 	entry_stage.text = "Stage: " + stage_names[roamer.attraction_stage]
 	stage_hint.text = _get_stage_hint(roamer)
 
@@ -206,6 +254,16 @@ func _on_roamer_selected(roamer):
 		needs_detail.add_theme_color_override("font_color", Color(0.52, 0.82, 0.32, 1.0))
 
 	family_detail.text = _get_family_text(roamer)
+
+	# Traits
+	if roamer.traits.is_empty():
+		family_detail.text += "\nTraits: None"
+	else:
+		var trait_text := "\nTraits: "
+		for t in roamer.traits:
+			var tdata = roamer.TRAIT_POOL.get(t, {})
+			trait_text += tdata.get("icon", "") + " " + tdata.get("name", t) + "  "
+		family_detail.text += trait_text.strip_edges()
 
 	# Discovery notes — use species_id for lookup, fall back to name
 	var lookup_key = roamer.species_id if roamer.species_id != "" else roamer.name

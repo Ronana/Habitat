@@ -60,6 +60,33 @@ var need_decay = {
 
 var happiness: float = 1.0
 
+# ── Naming ────────────────────────────────────────────────────────────────────
+var roamer_name: String = ""
+var _name_label_3d: Label3D = null
+
+const NAME_POOL: Array = [
+	"Briar", "Fern", "Cobble", "Ash", "Clover", "Mossy", "Twig", "Reed",
+	"Thistle", "Stone", "River", "Birch", "Elm", "Sage", "Hazel", "Thatch",
+	"Pebble", "Dew", "Sorrel", "Wren", "Flint", "Cedar", "Ivy", "Burr",
+	"Acorn", "Bramble", "Frost", "Glen", "Heath", "Larch"
+]
+
+# ── Traits ────────────────────────────────────────────────────────────────────
+var traits: Array = []
+
+const TRAIT_POOL: Dictionary = {
+	"shy":       {"name": "Shy",       "icon": "😳", "desc": "Moves slowly, stays cautious",        "speed_mult": 0.85, "food_mult": 0.90, "safety_mult": 1.15, "dewdrop_mult": 1.0 },
+	"bold":      {"name": "Bold",      "icon": "💪", "desc": "Confident, feels safer outdoors",     "speed_mult": 1.15, "food_mult": 1.0,  "safety_mult": 0.85, "dewdrop_mult": 1.0 },
+	"greedy":    {"name": "Greedy",    "icon": "🍃", "desc": "Always hungry, earns more dewdrops",  "speed_mult": 1.0,  "food_mult": 1.25, "safety_mult": 1.0,  "dewdrop_mult": 1.3 },
+	"playful":   {"name": "Playful",   "icon": "🎈", "desc": "Loves space, never feels crowded",    "speed_mult": 1.05, "food_mult": 1.0,  "safety_mult": 1.0,  "dewdrop_mult": 1.1 },
+	"nocturnal": {"name": "Nocturnal", "icon": "🌙", "desc": "More active at night",                "speed_mult": 1.0,  "food_mult": 0.9,  "safety_mult": 1.0,  "dewdrop_mult": 1.2 },
+	"hardy":     {"name": "Hardy",     "icon": "🛡", "desc": "All needs decay more slowly",         "speed_mult": 1.0,  "food_mult": 0.80, "safety_mult": 0.80, "dewdrop_mult": 1.0 },
+	"gentle":    {"name": "Gentle",    "icon": "🌸", "desc": "Rarely stressed, bonds easily",       "speed_mult": 0.90, "food_mult": 0.95, "safety_mult": 0.75, "dewdrop_mult": 1.0 },
+	"swift":     {"name": "Swift",     "icon": "💨", "desc": "Moves quickly across the garden",     "speed_mult": 1.30, "food_mult": 1.1,  "safety_mult": 1.0,  "dewdrop_mult": 1.0 },
+	"timid":     {"name": "Timid",     "icon": "🐾", "desc": "Stays close to home, wanders little", "speed_mult": 0.80, "food_mult": 0.95, "safety_mult": 1.20, "dewdrop_mult": 1.0 },
+	"radiant":   {"name": "Radiant",   "icon": "✨", "desc": "Glows brighter, earns more dewdrops", "speed_mult": 1.0,  "food_mult": 1.0,  "safety_mult": 1.0,  "dewdrop_mult": 1.5 },
+}
+
 # Sleep state
 var _is_sleeping: bool = false
 var _sleep_tween: Tween = null
@@ -75,6 +102,10 @@ var _ring_pulse_timer: float = 0.0
 var _idle_tween: Tween = null
 var _body_rest_y: float = 0.0  # cached body origin Y
 var _is_bobbing: bool = false
+
+# Cursor awareness
+var _just_became_idle: bool = false
+var _cursor_tilt_done: bool = false
 
 # Needs indicators
 var _need_label: Label3D = null
@@ -92,6 +123,15 @@ func _ready():
 	_create_selection_ring()
 	pick_wander_target()
 	_create_need_indicator()
+	# Name: generate if not set (save/load stamps it before add_child)
+	if roamer_name == "":
+		roamer_name = NAME_POOL[randi() % NAME_POOL.size()]
+	_create_name_label()
+	# Traits: assign if not set (save/load stamps them before add_child)
+	if traits.is_empty():
+		var count := 2 if randf() < 0.3 else 1
+		assign_random_traits(count)
+	_apply_trait_modifiers()
 	# Start idle bob after one frame so body node is positioned
 	await get_tree().process_frame
 	_start_idle_bob()
@@ -165,19 +205,18 @@ func _stop_idle_bob():
 
 # ── Sleep / wake ──────────────────────────────────────────────────────────────
 func _check_sleep_state():
-	if state == State.BREEDING or state == State.SLEEPING:
-		if state == State.SLEEPING:
-			# Still check for dawn wake-up
-			var hour: float = DayNightManager.current_time
-			if hour >= 6.0 and hour < 21.0:
-				_wake_up()
+	if state == State.BREEDING:
 		return
 	var hour: float = DayNightManager.current_time
 	var is_night: bool = hour >= 21.0 or hour < 6.0
-	if is_night and not _is_sleeping and state != State.SLEEP_WALKING:
-		_begin_sleep_walk()
-	elif not is_night and _is_sleeping:
-		_wake_up()
+	if is_night:
+		# Start heading to sleep if not already doing so
+		if state != State.SLEEPING and state != State.SLEEP_WALKING:
+			_begin_sleep_walk()
+	else:
+		# Dawn — wake up from any sleep state
+		if state == State.SLEEPING or state == State.SLEEP_WALKING:
+			_wake_up()
 
 func _begin_sleep_walk():
 	# Choose where to go — shelter if available, random rest spot otherwise
@@ -215,14 +254,12 @@ func _do_hunker_down_anim():
 		_sleep_tween.tween_property(label, "modulate", Color(0.5, 0.6, 0.5, 0.35), 1.5)
 
 func _wake_up():
-	if not _is_sleeping:
-		state = State.WANDERING
-		return
 	_is_sleeping = false
 	visible = true
-	# If we were in a shelter, reappear just outside it
+	# If we were sleeping inside a shelter, reappear just outside it
 	if has_shelter and is_instance_valid(shelter_node):
-		var exit_offset := Vector3(randf_range(-1.0, 1.0), 0.5, randf_range(-1.0, 1.0))
+		var angle := randf() * TAU
+		var exit_offset := Vector3(cos(angle) * 2.2, 0.5, sin(angle) * 2.2)
 		global_position = shelter_node.global_position + exit_offset
 	state = State.WANDERING
 	var body = get_node_or_null("Body")
@@ -499,6 +536,8 @@ func _complete_bond():
 	if mate and is_instance_valid(mate) and mate.family_id == "":
 		mate.family_id = family_id
 
+	MilestoneManager.fire("first_bred", "Love is in the Air! 💕", "Your first pair of roamers has bred.")
+
 	# Spawn egg at shelter
 	var shelter = _get_breed_shelter()
 	var spawn_pos = shelter.global_position if shelter else global_position
@@ -681,7 +720,7 @@ func _update_happiness_glow():
 func _handle_sleep_walk(delta):
 	var dir := _sleep_rest_pos - global_position
 	dir.y = 0.0
-	if dir.length() < 0.8:
+	if dir.length() < 2.5:
 		state = State.SLEEPING
 		_arrive_at_sleep_spot()
 		return
@@ -699,6 +738,8 @@ func handle_wandering(delta):
 		if randf() > 0.4:
 			state = State.IDLE
 			idle_timer = randf_range(2.0, 5.0)
+			_just_became_idle = true
+			_cursor_tilt_done = false
 		else:
 			pick_wander_target()
 		return
@@ -711,9 +752,36 @@ func handle_idle(delta):
 	idle_timer -= delta
 	velocity.x = 0
 	velocity.z = 0
+	_face_cursor(delta)
 	if idle_timer <= 0:
 		pick_wander_target()
 		state = State.WANDERING
+
+func _face_cursor(delta):
+	var cursor_node = get_tree().get_root().get_node_or_null("Garden/PlayerCursor")
+	if not cursor_node:
+		return
+	var target_pos: Vector3 = cursor_node.cursor_world_pos
+	var dir := target_pos - global_position
+	dir.y = 0.0
+	if dir.length() < 1.5:
+		return  # cursor too close — don't spin on the spot
+	var target_angle := atan2(-dir.x, -dir.z)
+	rotation.y = lerp_angle(rotation.y, target_angle, delta * 1.8)
+	# One-shot curious head-tilt when first noticing the cursor
+	if _just_became_idle and not _cursor_tilt_done and dir.length() < 12.0:
+		_cursor_tilt_done = true
+		_just_became_idle = false
+		_do_curious_tilt()
+
+func _do_curious_tilt():
+	var body := get_node_or_null("Body")
+	if not body or _is_sleeping:
+		return
+	var tween := create_tween().set_trans(Tween.TRANS_SINE)
+	tween.tween_property(body, "position:y", _body_rest_y + 0.06, 0.18)
+	tween.tween_property(body, "position:y", _body_rest_y - 0.04, 0.14)
+	tween.tween_property(body, "position:y", _body_rest_y,         0.22).set_ease(Tween.EASE_OUT)
 
 func pick_wander_target():
 	var wander_range = 20.0
@@ -766,6 +834,7 @@ func check_stage_progress():
 				attraction_stage = AttractionStage.RESIDENT
 				print(name, " is now a RESIDENT!")
 				WardenManager.gain_xp("roamer_resident")
+				MilestoneManager.fire("first_resident", "First Resident! 🏡", species_id + " has settled in your garden.")
 			elif happiness > 0.7 and not has_shelter:
 				print(name, " needs a shelter to become Resident!")
 		AttractionStage.RESIDENT:
@@ -773,6 +842,7 @@ func check_stage_progress():
 				attraction_stage = AttractionStage.BONDED
 				print(name, " is now BONDED!")
 				WardenManager.gain_xp("roamer_bonded")
+				MilestoneManager.fire("first_bonded", "Garden Bond! ✨", species_id + " has truly bonded with your garden.")
 				AudioManager.play_level_up()
 				ParticleManager.spawn_bond_sparkle(global_position)
 				ParticleManager.attach_dewdrop_aura(self)
@@ -794,3 +864,62 @@ func on_deselected():
 	body.set_surface_override_material(0, _glow_mat)
 	if selection_ring:
 		selection_ring.visible = false
+
+# ── Naming ────────────────────────────────────────────────────────────────────
+
+func _create_name_label():
+	_name_label_3d = Label3D.new()
+	_name_label_3d.name = "NameLabel"
+	_name_label_3d.text = roamer_name
+	_name_label_3d.font_size = 28
+	_name_label_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_name_label_3d.no_depth_test = true
+	_name_label_3d.modulate = Color(0.92, 0.98, 0.80, 0.90)
+	_name_label_3d.outline_modulate = Color(0.05, 0.10, 0.03, 1.0)
+	_name_label_3d.outline_size = 6
+	_name_label_3d.position = Vector3(0.0, 1.85, 0.0)
+	add_child(_name_label_3d)
+
+func set_roamer_name(new_name: String) -> void:
+	roamer_name = new_name.strip_edges()
+	if roamer_name == "":
+		roamer_name = NAME_POOL[randi() % NAME_POOL.size()]
+	if _name_label_3d:
+		_name_label_3d.text = roamer_name
+
+# ── Traits ────────────────────────────────────────────────────────────────────
+
+func assign_random_traits(count: int = 1) -> void:
+	var keys := TRAIT_POOL.keys()
+	keys.shuffle()
+	traits.clear()
+	for i in range(min(count, keys.size())):
+		traits.append(keys[i])
+
+func _apply_trait_modifiers() -> void:
+	var speed_mult := 1.0
+	var food_mult  := 1.0
+	var safety_mult := 1.0
+	var dewdrop_mult := 1.0
+	for trait_id in traits:
+		var t: Dictionary = TRAIT_POOL.get(trait_id, {})
+		if t.is_empty():
+			continue
+		speed_mult    *= t.get("speed_mult",   1.0)
+		food_mult     *= t.get("food_mult",    1.0)
+		safety_mult   *= t.get("safety_mult",  1.0)
+		dewdrop_mult  *= t.get("dewdrop_mult", 1.0)
+	move_speed             *= speed_mult
+	need_decay["food"]     *= food_mult
+	need_decay["safety"]   *= safety_mult
+	dewdrop_interval       /= dewdrop_mult  # lower interval = earn faster
+
+func get_traits_display() -> String:
+	if traits.is_empty():
+		return ""
+	var parts := []
+	for trait_id in traits:
+		var t: Dictionary = TRAIT_POOL.get(trait_id, {})
+		if not t.is_empty():
+			parts.append(t.get("icon", "") + " " + t.get("name", trait_id))
+	return "  ".join(parts)

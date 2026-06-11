@@ -35,6 +35,17 @@ var focus_point: Vector3 = Vector3(0, 0, 0)
 func _ready():
 	target_position = global_position
 	_update_camera_transform()
+	_apply_settings()
+	if SettingsManager:
+		SettingsManager.settings_changed.connect(_apply_settings)
+
+func _apply_settings():
+	move_speed      = SettingsManager.get_setting("cam_move_speed",     20.0)
+	zoom_speed      = SettingsManager.get_setting("cam_zoom_speed",      3.0)
+	pan_speed       = SettingsManager.get_setting("cam_pan_speed",       0.05)
+	rotation_speed  = SettingsManager.get_setting("cam_rotation_speed",  0.3)
+	use_edge_scroll = SettingsManager.get_setting("cam_edge_scroll",     true)
+	# cam_invert_y is read live in _unhandled_input
 
 func _process(delta):
 	handle_keyboard_pan(delta)
@@ -58,9 +69,10 @@ func _unhandled_input(event):
 
 	if event is InputEventMouseMotion:
 		if is_rotating:
-			current_yaw -= event.relative.x * rotation_speed
-			current_pitch -= event.relative.y * rotation_speed
-			current_pitch = clamp(current_pitch, min_pitch, max_pitch)
+			var invert_y: bool = SettingsManager.get_setting("cam_invert_y", false)
+			current_yaw   -= event.relative.x * rotation_speed
+			current_pitch -= event.relative.y * rotation_speed * (-1.0 if invert_y else 1.0)
+			current_pitch  = clamp(current_pitch, min_pitch, max_pitch)
 		if is_panning:
 			var right = global_transform.basis.x
 			var forward = Vector3(

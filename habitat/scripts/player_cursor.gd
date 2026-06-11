@@ -4,6 +4,29 @@ extends Node3D
 
 var selected_roamer = null
 
+# World position of the cursor on the terrain — updated 10×/sec for roamers to read
+var cursor_world_pos: Vector3 = Vector3.ZERO
+var _cursor_update_timer: float = 0.0
+
+func _process(delta):
+	_cursor_update_timer -= delta
+	if _cursor_update_timer <= 0.0:
+		_cursor_update_timer = 0.1
+		_refresh_cursor_world_pos()
+
+func _refresh_cursor_world_pos():
+	var cam: Camera3D = get_camera()
+	if not cam:
+		return
+	var mouse_pos := get_viewport().get_mouse_position()
+	var ray_origin := cam.project_ray_origin(mouse_pos)
+	var ray_end := ray_origin + cam.project_ray_normal(mouse_pos) * 200.0
+	var space_state := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	var result := space_state.intersect_ray(query)
+	if result:
+		cursor_world_pos = result.position
+
 func _input(event):
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:

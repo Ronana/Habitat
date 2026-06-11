@@ -1,12 +1,37 @@
 extends Node3D
 
 var shop_items = [
-	{"name": "Berry Seeds",     "cost": 10.0, "min_level": 1, "description": "Plant a berry bush. Roamers will seek it out when hungry."},
-	{"name": "Roamer Treat",    "cost": 8.0,  "min_level": 1, "description": "A tasty snack. Select a Roamer then use from inventory to feed them."},
-	{"name": "Oak Sapling",     "cost": 25.0, "min_level": 1, "description": "Plant a tree. Woodland Roamers love to shelter beneath them."},
-	{"name": "Basic Shelter",   "cost": 30.0, "min_level": 1, "description": "A cosy home for a Roamer. Place it to help Roamers become Residents."},
-	{"name": "Wildgrass Seeds", "cost": 15.0, "min_level": 2, "description": "Plant wild grass. Increases the space felt by nearby Roamers."},
-	{"name": "Cosy Burrow",     "cost": 55.0, "min_level": 3, "description": "A snug underground den. Provides stronger safety than a Basic Shelter."},
+	# ── Essentials ──────────────────────────────────────────────────────────────
+	{"name": "Berry Seeds",      "cost": 10.0, "min_level": 1,
+		"description": "Plant a berry bush. Roamers will seek it out when hungry."},
+	{"name": "Roamer Treat",     "cost": 8.0,  "min_level": 1,
+		"description": "A tasty snack. Select a Roamer then use from inventory to feed them."},
+	{"name": "Oak Sapling",      "cost": 25.0, "min_level": 1,
+		"description": "Plant a tree. Woodland Roamers love to shelter beneath them."},
+	{"name": "Basic Shelter",    "cost": 30.0, "min_level": 1,
+		"description": "A cosy home for a Roamer. Place it to help Roamers become Residents."},
+	{"name": "Wildgrass Seeds",  "cost": 15.0, "min_level": 2,
+		"description": "Plant wild grass. Increases the space felt by nearby Roamers."},
+	{"name": "Cosy Burrow",      "cost": 55.0, "min_level": 3,
+		"description": "A snug underground den. Provides stronger safety than a Basic Shelter."},
+	# ── Decoratives ─────────────────────────────────────────────────────────────
+	{"name": "Flower Patch",     "cost": 12.0, "min_level": 1,
+		"description": "A cluster of colourful wildflowers. Brightens up any corner of the garden."},
+	{"name": "Mossy Rock",       "cost": 18.0, "min_level": 1,
+		"description": "A mossy boulder. Roamers like to sit near large rocks."},
+	{"name": "Mushroom Cluster", "cost": 14.0, "min_level": 2,
+		"description": "Earthy toadstools in autumnal shades. A favourite of Stonebacks."},
+	{"name": "Fallen Log",       "cost": 22.0, "min_level": 2,
+		"description": "A mossy log. Adds a woodland feel and gives critters a place to rest beside."},
+	# ── Lighting ────────────────────────────────────────────────────────────────
+	{"name": "Garden Lantern",   "cost": 40.0, "min_level": 2,
+		"description": "A warm lantern that lights up at dusk. Keeps the garden cosy through the night."},
+	{"name": "Glowing Mushroom", "cost": 35.0, "min_level": 3,
+		"description": "A bioluminescent mushroom that pulses with soft blue-green light."},
+	{"name": "Firefly Jar",      "cost": 30.0, "min_level": 3,
+		"description": "A sealed jar full of fireflies. Flickers gently and releases sparkles."},
+	{"name": "Moss Torch",       "cost": 45.0, "min_level": 4,
+		"description": "A stone torch draped in moss. Casts a warm, flickering glow over a wide area."},
 ]
 
 var is_shop_open = false

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://c017yserk35hg"]
 
-[ext_resource type="Script" uid="uid://fdk1ia8bwlv" path="res://scripts/roamer_base.gd" id="1_13udl"]
+[ext_resource type="Script" path="res://scripts/glowfox.gd" id="1_13udl"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_orange"]
 albedo_color = Color(0.82, 0.42, 0.12, 1)

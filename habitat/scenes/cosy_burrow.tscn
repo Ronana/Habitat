@@ -57,7 +57,14 @@ mesh = SubResource("CylinderMesh_entrance")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 shape = SubResource("SphereShape3D_col")
 
-[node name="InteractionArea" type="Area3D" parent="."]
+[node name="ShelterLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 0)
+billboard = 1
+no_depth_test = true
+text = "Shelter"
+font_size = 28
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractionArea"]
+[node name="ShelterArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShelterArea"]
 shape = SubResource("BoxShape3D_interact")

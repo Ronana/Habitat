@@ -55,7 +55,15 @@ func _update_colour(hit_pos: Vector3):
 	elif hit_pos.y <= -0.8:
 		target = water_colour
 	else:
-		target = normal_colour
+		# When a placement item is active, show red if the spot is blocked
+		var tool_mgr = get_tree().get_root().get_node_or_null("Garden/ToolManager")
+		if tool_mgr and tool_mgr.placement_item != "":
+			if tool_mgr.is_placement_clear(hit_pos, tool_mgr.placement_item):
+				target = normal_colour
+			else:
+				target = limit_colour  # red = blocked
+		else:
+			target = normal_colour
 	if target != current_colour:
 		current_colour = target
 		cursor_mat.albedo_color = Color(target, 0.85)

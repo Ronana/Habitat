@@ -52,7 +52,9 @@ func save_game(_garden: Node):
 			"grow_up_timer": roamer.grow_up_timer,
 			"family_id": roamer.family_id,
 			"parent_a_id": roamer.parent_a_id,
-			"parent_b_id": roamer.parent_b_id
+			"parent_b_id": roamer.parent_b_id,
+			"roamer_name": roamer.roamer_name,
+			"traits": roamer.traits
 		})
 	
 	# Save all berry bushes
@@ -68,16 +70,36 @@ func save_game(_garden: Node):
 	# Save shelters
 	save_data["shelters"] = []
 	for shelter in get_tree().get_nodes_in_group("shelters"):
+		var uids: Array = []
+		for r in shelter.assigned_roamers:
+			if is_instance_valid(r):
+				uids.append(r.roamer_uid)
 		save_data["shelters"].append({
 			"position": {
 				"x": shelter.global_position.x,
 				"y": shelter.global_position.y,
 				"z": shelter.global_position.z
 			},
-			"occupied": shelter.is_occupied,
-			"assigned_roamer": shelter.assigned_roamer.name if shelter.assigned_roamer else ""
+			"resident_species": shelter.resident_species,
+			"assigned_roamer_uids": uids
 		})
-	
+
+	# Save decoratives
+	save_data["decoratives"] = []
+	for item in get_tree().get_nodes_in_group("decoratives"):
+		save_data["decoratives"].append({
+			"type": item.scene_file_path,
+			"position": {
+				"x": item.global_position.x,
+				"y": item.global_position.y,
+				"z": item.global_position.z
+			},
+			"rotation_y": (item as Node3D).rotation.y
+		})
+
+	# Save milestones
+	save_data["milestones"] = MilestoneManager.achieved
+
 	# Write to file
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	file.store_string(JSON.stringify(save_data, "\t"))
@@ -101,11 +123,13 @@ func load_game(_garden: Node):
 	
 	var save_data = json.get_data()
 	
-	# Remove existing Roamers and bushes before loading
+	# Remove existing Roamers, bushes, and decoratives before loading
 	for roamer in get_tree().get_nodes_in_group("roamers"):
 		roamer.queue_free()
 	for bush in get_tree().get_nodes_in_group("food"):
 		bush.queue_free()
+	for decor in get_tree().get_nodes_in_group("decoratives"):
+		decor.queue_free()
 	
 	# Wait one frame for queue_free to complete
 	await get_tree().process_frame
@@ -167,6 +191,10 @@ func load_game(_garden: Node):
 			roamer.family_id = roamer_data.get("family_id", "")
 			roamer.parent_a_id = roamer_data.get("parent_a_id", "")
 			roamer.parent_b_id = roamer_data.get("parent_b_id", "")
+			roamer.roamer_name = roamer_data.get("roamer_name", "")
+			var saved_traits = roamer_data.get("traits", [])
+			if not saved_traits.is_empty():
+				roamer.traits = saved_traits
 			if not roamer.is_adult:
 				roamer.scale = Vector3(0.6, 0.6, 0.6)
 			_garden.add_child(roamer)
@@ -175,7 +203,7 @@ func load_game(_garden: Node):
 				roamer_data["position"]["y"],
 				roamer_data["position"]["z"]
 			)
-			roamer.attraction_stage = roamer_data["stage"]
+			roamer.attraction_stage = roamer_data["stage"] as int
 			roamer.needs = roamer_data["needs"]
 			roamer.happiness = roamer_data.get("happiness", 1.0)
 	
@@ -190,9 +218,13 @@ func load_game(_garden: Node):
 			bush_data["position"]["z"]
 		)
 		
-	# Restore shelters and re-link to their roamers
+	# Restore shelters and re-link to their roamers by UID
 	if save_data.has("shelters"):
 		var shelter_scene = load("res://scenes/shelter.tscn")
+		# Build a UID → roamer lookup for fast matching
+		var uid_map: Dictionary = {}
+		for roamer in get_tree().get_nodes_in_group("roamers"):
+			uid_map[roamer.roamer_uid] = roamer
 		for shelter_data in save_data["shelters"]:
 			var shelter = shelter_scene.instantiate()
 			_garden.add_child(shelter)
@@ -201,15 +233,42 @@ func load_game(_garden: Node):
 				shelter_data["position"]["y"],
 				shelter_data["position"]["z"]
 			)
-			var assigned_name = shelter_data.get("assigned_roamer", "")
-			if assigned_name != "":
-				for roamer in get_tree().get_nodes_in_group("roamers"):
-					if roamer.name == assigned_name:
-						shelter.is_occupied = true
-						shelter.assigned_roamer = roamer
-						roamer.has_shelter = true
-						roamer.shelter_node = shelter
-						break
+			shelter.resident_species = shelter_data.get("resident_species", "")
+			var uids = shelter_data.get("assigned_roamer_uids", [])
+			# Legacy compat: old saves used "assigned_roamer" (name string)
+			if uids.is_empty():
+				var old_name = shelter_data.get("assigned_roamer", "")
+				if old_name != "":
+					for r in get_tree().get_nodes_in_group("roamers"):
+						if r.name == old_name:
+							shelter.assign_roamer(r)
+							break
+			else:
+				for uid in uids:
+					if uid_map.has(uid):
+						shelter.assign_roamer(uid_map[uid])
+
+	# Restore decoratives
+	if save_data.has("decoratives"):
+		for item_data in save_data["decoratives"]:
+			var scene_path: String = item_data.get("type", "")
+			if scene_path == "":
+				continue
+			var packed = load(scene_path)
+			if not packed:
+				continue
+			var item = packed.instantiate()
+			_garden.add_child(item)
+			item.global_position = Vector3(
+				item_data["position"]["x"],
+				item_data["position"]["y"],
+				item_data["position"]["z"]
+			)
+			(item as Node3D).rotation.y = item_data.get("rotation_y", 0.0)
+
+	# Restore milestones
+	if save_data.has("milestones"):
+		MilestoneManager.achieved = save_data["milestones"]
 
 	print("Game loaded successfully!")
 	return true

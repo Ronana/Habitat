@@ -20,7 +20,57 @@ var starter_area_size: float = 40.0
 var shelter_scene: PackedScene    = preload("res://scenes/shelter.tscn")
 var wildgrass_scene: PackedScene  = preload("res://scenes/wildgrass.tscn")
 var cosy_burrow_scene: PackedScene = preload("res://scenes/cosy_burrow.tscn")
+# Decoratives
+var flower_patch_scene: PackedScene     = preload("res://scenes/flower_patch.tscn")
+var mossy_rock_scene: PackedScene       = preload("res://scenes/mossy_rock.tscn")
+var mushroom_cluster_scene: PackedScene = preload("res://scenes/mushroom_cluster.tscn")
+var fallen_log_scene: PackedScene       = preload("res://scenes/fallen_log.tscn")
+# Lighting
+var garden_lantern_scene: PackedScene   = preload("res://scenes/garden_lantern.tscn")
+var glowing_mushroom_scene: PackedScene = preload("res://scenes/glowing_mushroom.tscn")
+var firefly_jar_scene: PackedScene      = preload("res://scenes/firefly_jar.tscn")
+var moss_torch_scene: PackedScene       = preload("res://scenes/moss_torch.tscn")
 var _terrain_mat: ShaderMaterial = null
+
+# Radius (world units) that must be clear around the placement point per item
+const PLACEMENT_RADII: Dictionary = {
+	"Berry Seeds":      1.1,
+	"Oak Sapling":      2.0,
+	"Basic Shelter":    3.0,
+	"Wildgrass Seeds":  0.8,
+	"Cosy Burrow":      2.4,
+	# Decoratives
+	"Flower Patch":     0.6,
+	"Mossy Rock":       0.9,
+	"Mushroom Cluster": 0.7,
+	"Fallen Log":       1.1,
+	# Lighting
+	"Garden Lantern":   0.7,
+	"Glowing Mushroom": 0.5,
+	"Firefly Jar":      0.4,
+	"Moss Torch":       0.5,
+}
+# How much space each existing object group occupies
+const OBJECT_GROUP_RADII: Dictionary = {
+	"food":        1.1,
+	"trees":       2.0,
+	"shelters":    3.0,
+	"debris":      0.8,
+	"decoratives": 0.6,
+}
+
+# Exposed publicly so ground_cursor can poll it for the preview colour.
+func is_placement_clear(pos: Vector3, item_name: String) -> bool:
+	var new_r: float = PLACEMENT_RADII.get(item_name, 1.5)
+	for group in OBJECT_GROUP_RADII:
+		var existing_r: float = OBJECT_GROUP_RADII[group]
+		var min_dist_sq: float = (new_r + existing_r) * (new_r + existing_r)
+		for node in get_tree().get_nodes_in_group(group):
+			var dx: float = pos.x - (node as Node3D).global_position.x
+			var dz: float = pos.z - (node as Node3D).global_position.z
+			if dx * dx + dz * dz < min_dist_sq:
+				return false
+	return true
 
 func _ready():
 	ground_mesh = get_parent().get_node("Ground")
@@ -84,6 +134,15 @@ func place_item():
 	var result = space_state.intersect_ray(query)
 	
 	if result:
+		# ── Clearance check ────────────────────────────────────────────────────
+		if not is_placement_clear(result.position, placement_item):
+			AudioManager.play_error()
+			var ui_err = get_parent().get_node_or_null("RoamerUI")
+			if ui_err:
+				ui_err.placement_label.modulate = Color(1.0, 0.3, 0.3)
+				ui_err.placement_label.text = "❌ Too close to another object!"
+			return
+		# ── Place ──────────────────────────────────────────────────────────────
 		var placed = false
 		match placement_item:
 			"Berry Seeds":
@@ -123,11 +182,77 @@ func place_item():
 					burrow.global_position = result.position
 					WardenManager.gain_xp("bush_planted")
 					placed = true
+			# ── Decoratives ───────────────────────────────────────────────────
+			"Flower Patch":
+				if InventoryManager.remove_item("Flower Patch"):
+					var item = flower_patch_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					WardenManager.gain_xp("decor_placed")
+					placed = true
+			"Mossy Rock":
+				if InventoryManager.remove_item("Mossy Rock"):
+					var item = mossy_rock_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					WardenManager.gain_xp("decor_placed")
+					placed = true
+			"Mushroom Cluster":
+				if InventoryManager.remove_item("Mushroom Cluster"):
+					var item = mushroom_cluster_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					WardenManager.gain_xp("decor_placed")
+					placed = true
+			"Fallen Log":
+				if InventoryManager.remove_item("Fallen Log"):
+					var item = fallen_log_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					WardenManager.gain_xp("decor_placed")
+					placed = true
+			# ── Lighting ──────────────────────────────────────────────────────
+			"Garden Lantern":
+				if InventoryManager.remove_item("Garden Lantern"):
+					var item = garden_lantern_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					WardenManager.gain_xp("decor_placed")
+					placed = true
+			"Glowing Mushroom":
+				if InventoryManager.remove_item("Glowing Mushroom"):
+					var item = glowing_mushroom_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					WardenManager.gain_xp("decor_placed")
+					placed = true
+			"Firefly Jar":
+				if InventoryManager.remove_item("Firefly Jar"):
+					var item = firefly_jar_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					WardenManager.gain_xp("decor_placed")
+					placed = true
+			"Moss Torch":
+				if InventoryManager.remove_item("Moss Torch"):
+					var item = moss_torch_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					WardenManager.gain_xp("decor_placed")
+					placed = true
 		if placed:
 			placement_item = ""
 			AudioManager.play_place()
 			var ui = get_parent().get_node_or_null("RoamerUI")
 			if ui:
+				ui.placement_label.modulate = Color(1, 1, 1, 1)
 				ui.placement_label.text = ""
 
 
@@ -259,7 +384,7 @@ func update_ground_collision():
 
 func snap_all_statics():
 	var space_state = get_world_3d().direct_space_state
-	for group in ["shelters", "food", "debris", "trees"]:
+	for group in ["shelters", "food", "debris", "trees", "decoratives"]:
 		for node in get_tree().get_nodes_in_group(group):
 			_snap_node_to_ground(node, space_state)
 	var maren = get_parent().get_node_or_null("Maren")

@@ -65,6 +65,12 @@ func _ready():
 	SeasonManager.environment = env
 	SeasonManager.sun = sun
 	
+	# Pause menu
+	var pause_scene := load("res://scenes/pause_menu.tscn") as PackedScene
+	if pause_scene:
+		var pause_menu := pause_scene.instantiate()
+		add_child(pause_menu)
+
 	# Try to load save
 	var loaded = await SaveManager.load_game(self)
 	if not loaded:

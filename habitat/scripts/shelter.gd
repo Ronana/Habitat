@@ -53,6 +53,8 @@ func assign_roamer(roamer):
 	_update_label()
 	print(roamer.name, " has moved into their ", resident_species, " Den")
 	roamer.check_stage_progress()
+	if assigned_roamers.size() >= max_residents:
+		MilestoneManager.fire("first_full_den", "Full House! 🏠", resident_species + " Den is at full capacity.")
 
 func unassign_roamer(roamer):
 	assigned_roamers.erase(roamer)
@@ -63,6 +65,15 @@ func unassign_roamer(roamer):
 	if assigned_roamers.is_empty():
 		resident_species = ""
 	_update_label()
+
+func get_display_name() -> String:
+	if assigned_roamers.is_empty():
+		return "Empty Shelter"
+	var count := assigned_roamers.size()
+	var den_name := resident_species + " Den" if resident_species != "" else "Den"
+	if count > 1:
+		den_name += " (" + str(count) + ")"
+	return den_name
 
 func _update_label():
 	if assigned_roamers.is_empty():
