@@ -9,9 +9,36 @@ var max_eats: int = 5
 var regrow_time: float = 20.0
 var regrow_timer: float = 0.0
 
+# Season colours: [bush_colour, berry_colour]
+const SEASON_COLOURS = {
+	0: [Color(0.22, 0.46, 0.14, 1), Color(0.80, 0.40, 0.55, 1)],  # Spring — fresh green, pink blossom
+	1: [Color(0.15, 0.38, 0.10, 1), Color(0.55, 0.10, 0.10, 1)],  # Summer — rich green, deep red
+	2: [Color(0.52, 0.34, 0.10, 1), Color(0.65, 0.22, 0.08, 1)],  # Autumn — amber, burnt orange
+	3: [Color(0.28, 0.24, 0.18, 1), Color(0.30, 0.26, 0.22, 1)],  # Winter — bare grey-brown
+}
+
 func _ready():
 	add_to_group("food")
 	$FoodArea.body_entered.connect(_on_body_entered)
+	SeasonManager.season_changed.connect(_on_season_changed)
+	_apply_season_colours(SeasonManager.current_season)
+
+func _on_season_changed(season: int):
+	_apply_season_colours(season)
+
+func _apply_season_colours(season: int):
+	var colours = SEASON_COLOURS.get(season, SEASON_COLOURS[0])
+	_set_mesh_colour($Bush, colours[0])
+	_set_mesh_colour($Berries, colours[1])
+
+func _set_mesh_colour(node: MeshInstance3D, colour: Color):
+	var mat: StandardMaterial3D = node.get_surface_override_material(0)
+	if mat == null:
+		mat = node.mesh.surface_get_material(0).duplicate() as StandardMaterial3D
+	else:
+		mat = mat.duplicate() as StandardMaterial3D
+	mat.albedo_color = colour
+	node.set_surface_override_material(0, mat)
 
 func _process(delta):
 	if cooldown_timer > 0:

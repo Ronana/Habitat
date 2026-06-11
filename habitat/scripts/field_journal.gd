@@ -19,11 +19,13 @@ var journal_entries = {}
 var roamer_tips = {
 	"GlowFox": "Glowfoxes are drawn to warmth and berry bushes. Plant berries nearby and they will visit more readily. They are most active at dusk when their fur begins to glow.",
 	"Mossdeer": "Mossdeer are gentle grazers that prefer open spaces. They are nervous creatures — avoid loud activities nearby. Their mossy antlers grow larger the happier they are.",
+	"Stoneback": "Stonebacks are ancient and patient. They require at least two shelters before they feel safe enough to settle — one to sleep in and one to retreat to. They live very long lives and generate steady dewdrops simply by existing in a calm garden.",
 }
 
 var roamer_discovery_notes = {
 	"GlowFox": "A fox whose fur smoulders with a warm amber glow. First spotted at the edge of the wilderness, drawn by the scent of berries.",
 	"Mossdeer": "A graceful deer with antlers carpeted in living moss and tiny wildflowers. Moves slowly and deliberately through open clearings.",
+	"Stoneback": "A tortoise with a shell of ancient stone, etched with grooves that deepen with age. Moves with unhurried purpose and seems unbothered by the passage of seasons.",
 }
 
 func _ready():

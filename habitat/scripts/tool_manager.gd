@@ -17,7 +17,9 @@ var ground_mesh: MeshInstance3D
 var mesh_data_tool: MeshDataTool
 var array_mesh: ArrayMesh
 var starter_area_size: float = 40.0
-var shelter_scene: PackedScene = preload("res://scenes/shelter.tscn")
+var shelter_scene: PackedScene    = preload("res://scenes/shelter.tscn")
+var wildgrass_scene: PackedScene  = preload("res://scenes/wildgrass.tscn")
+var cosy_burrow_scene: PackedScene = preload("res://scenes/cosy_burrow.tscn")
 var _terrain_mat: ShaderMaterial = null
 
 func _ready():
@@ -105,8 +107,25 @@ func place_item():
 					shelter.global_position = result.position
 					WardenManager.gain_xp("bush_planted")
 					placed = true
+			"Wildgrass Seeds":
+				if InventoryManager.remove_item("Wildgrass Seeds"):
+					var grass = wildgrass_scene.instantiate()
+					get_parent().add_child(grass)
+					grass.global_position = result.position
+					grass.rotation.y = randf_range(0.0, TAU)
+					grass.add_to_group("debris")
+					WardenManager.gain_xp("bush_planted")
+					placed = true
+			"Cosy Burrow":
+				if InventoryManager.remove_item("Cosy Burrow"):
+					var burrow = cosy_burrow_scene.instantiate()
+					get_parent().add_child(burrow)
+					burrow.global_position = result.position
+					WardenManager.gain_xp("bush_planted")
+					placed = true
 		if placed:
 			placement_item = ""
+			AudioManager.play_place()
 			var ui = get_parent().get_node_or_null("RoamerUI")
 			if ui:
 				ui.placement_label.text = ""
@@ -212,7 +231,6 @@ func apply_terrain_colours():
 			st.set_color(vert_colors[vi])
 			st.add_vertex(vertices[vi])
 	st.generate_normals()
-	st.generate_tangents()
 	ground_mesh.mesh = st.commit()
 
 	# Create ShaderMaterial once, reuse every subsequent call

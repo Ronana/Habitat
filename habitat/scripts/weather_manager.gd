@@ -87,6 +87,18 @@ func apply_weather_effects():
 			environment.fog_enabled = false
 			if rain_particles:
 				rain_particles.emitting = false
+			# Autumn wind kicks up leaves
+			if SeasonManager.current_season == SeasonManager.Season.AUTUMN:
+				_scatter_leaves()
+
+func _scatter_leaves():
+	# Burst a few leaf clusters around the garden
+	var garden = Engine.get_main_loop().get_root().get_node_or_null("Garden")
+	if not garden:
+		return
+	for i in range(5):
+		var offset := Vector3(randf_range(-12, 12), 2.0, randf_range(-12, 12))
+		ParticleManager.spawn_leaf_drift(garden.global_position + offset)
 
 func get_weather_name() -> String:
 	match current_weather:

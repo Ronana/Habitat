@@ -37,6 +37,14 @@ var species_requirements: Dictionary = {
 		"max_in_garden": 3,
 		"label": "🦌 Mossdeer"
 	},
+	"Stoneback": {
+		"scene": "res://creatures/stoneback.tscn",
+		"min_food": 1,
+		"min_shelters": 2,
+		"min_avg_happiness": 0.55,
+		"max_in_garden": 2,
+		"label": "🐢 Stoneback"
+	},
 }
 
 func _ready():

@@ -1,0 +1,53 @@
+[gd_scene format=3 uid="uid://wildgrass001"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grass1"]
+albedo_color = Color(0.38, 0.62, 0.22, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grass2"]
+albedo_color = Color(0.48, 0.72, 0.28, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_blade1"]
+material = SubResource("StandardMaterial3D_grass1")
+top_radius = 0.02
+bottom_radius = 0.06
+height = 0.55
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_blade2"]
+material = SubResource("StandardMaterial3D_grass2")
+top_radius = 0.02
+bottom_radius = 0.06
+height = 0.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_blade3"]
+material = SubResource("StandardMaterial3D_grass1")
+top_radius = 0.02
+bottom_radius = 0.06
+height = 0.60
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_wg1"]
+radius = 1.2
+
+[node name="Wildgrass" type="Node3D"]
+
+[node name="Blade1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.94, 0.12, -0.32, 0, 0.94, 0.34, 0.34, -0.32, 0.88, -0.18, 0.28, 0.12)
+mesh = SubResource("CylinderMesh_blade1")
+
+[node name="Blade2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.88, -0.20, 0.43, 0, 0.91, 0.41, -0.47, -0.37, 0.80, 0.22, 0.23, -0.15)
+mesh = SubResource("CylinderMesh_blade2")
+
+[node name="Blade3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.96, 0.28, 0, -0.28, 0.96, 0.05, 0.30, 0.20)
+mesh = SubResource("CylinderMesh_blade3")
+
+[node name="Blade4" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.92, 0.18, -0.35, 0, 0.89, 0.45, 0.39, -0.42, 0.82, -0.10, 0.25, -0.22)
+mesh = SubResource("CylinderMesh_blade1")
+
+[node name="SpaceArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SpaceArea"]
+shape = SubResource("SphereShape3D_wg1")

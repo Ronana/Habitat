@@ -247,8 +247,10 @@ func _on_buy_item(index: int):
 		current_trader.buy_item(index)
 		_update_shop_dewdrops()
 		_show_shop_feedback("Purchased: " + item["name"] + "!", Color(0.3, 0.9, 0.3))
+		AudioManager.play_buy()
 	else:
 		_show_shop_feedback("Not enough Dewdrops! (need " + str(int(item["cost"])) + ")", Color(1, 0.3, 0.3))
+		AudioManager.play_error()
 
 func _show_shop_feedback(msg: String, colour: Color):
 	shop_feedback.text = msg
@@ -285,6 +287,7 @@ func update_inventory_ui():
 		item_list.add_child(btn)
 
 func _on_inventory_item_pressed(item_name: String):
+	AudioManager.play_select()
 	if item_name == "Roamer Treat":
 		use_roamer_treat()
 		return
@@ -334,8 +337,58 @@ func update_warden_ui():
 	xp_bar.value = WardenManager.get_level_progress()
 
 func show_level_up_message():
-	# Simple level up notification for now
-	print("UI: Level up to ", WardenManager.current_level)
+	# Build a centred popup panel
+	var popup := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.10, 0.06, 0.96)
+	style.border_color = C_ACCENT
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(18)
+	popup.add_theme_stylebox_override("panel", style)
+	popup.set_anchors_preset(Control.PRESET_CENTER)
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 6)
+	popup.add_child(vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "✨ LEVEL UP!"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 22)
+	title_lbl.add_theme_color_override("font_color", C_ACCENT)
+	vbox.add_child(title_lbl)
+
+	var level_lbl := Label.new()
+	level_lbl.text = "Warden Level " + str(WardenManager.current_level)
+	level_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_lbl.add_theme_font_size_override("font_size", 16)
+	level_lbl.add_theme_color_override("font_color", C_TEXT)
+	vbox.add_child(level_lbl)
+
+	var unlock_text: String = WardenManager.level_unlocks.get(WardenManager.current_level, "")
+	if unlock_text != "":
+		var sep := HSeparator.new()
+		vbox.add_child(sep)
+		var unlock_lbl := Label.new()
+		unlock_lbl.text = "🔓 " + unlock_text
+		unlock_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		unlock_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		unlock_lbl.custom_minimum_size = Vector2(300, 0)
+		unlock_lbl.add_theme_font_size_override("font_size", 12)
+		unlock_lbl.add_theme_color_override("font_color", Color(0.85, 0.95, 0.65, 1.0))
+		vbox.add_child(unlock_lbl)
+
+	add_child(popup)
+
+	# Animate: fade in, hold, fade out
+	popup.modulate = Color(1, 1, 1, 0)
+	var tween := create_tween()
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 1), 0.4)
+	tween.tween_interval(2.8)
+	tween.tween_property(popup, "modulate", Color(1, 1, 1, 0), 0.6)
+	tween.tween_callback(popup.queue_free)
 
 func _on_journal_button():
 	var journal = get_tree().get_root().get_node("Garden/FieldJournal")

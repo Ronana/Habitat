@@ -33,7 +33,20 @@ func hatch():
 	get_parent().add_child(creature)
 	creature.global_position = global_position + Vector3(0, 1.0, 0)
 
+	# Inherit parent's den so the offspring has a home from birth
+	_try_inherit_den(creature)
+
 	CurrencyManager.add_dewdrops(15.0)
 	WardenManager.gain_xp("egg_hatched")
 	print("An egg hatched! ", creature.name, " is a child of family ", family_id)
 	queue_free()
+
+func _try_inherit_den(offspring):
+	# Look for a parent roamer that has a shelter and matches our species
+	for roamer in get_tree().get_nodes_in_group("roamers"):
+		if roamer.roamer_uid == parent_a_id or roamer.roamer_uid == parent_b_id:
+			if roamer.has_shelter and is_instance_valid(roamer.shelter_node):
+				var den = roamer.shelter_node
+				if den.has_method("can_accept") and den.can_accept(offspring):
+					den.assign_roamer(offspring)
+				return

@@ -1,0 +1,144 @@
+[gd_scene format=3 uid="uid://stoneback001"]
+
+[ext_resource type="Script" path="res://scripts/stoneback.gd" id="1_stbk"]
+
+; ── Materials ──────────────────────────────────────────────────────────────────
+[sub_resource type="StandardMaterial3D" id="Mat_shell"]
+albedo_color = Color(0.40, 0.38, 0.33, 1)
+roughness = 0.94
+
+[sub_resource type="StandardMaterial3D" id="Mat_rim"]
+albedo_color = Color(0.30, 0.28, 0.24, 1)
+roughness = 0.96
+
+[sub_resource type="StandardMaterial3D" id="Mat_skin"]
+albedo_color = Color(0.56, 0.50, 0.38, 1)
+roughness = 0.88
+
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.14, 0.12, 0.10, 1)
+roughness = 0.80
+
+; ── Meshes ─────────────────────────────────────────────────────────────────────
+[sub_resource type="SphereMesh" id="Mesh_shell"]
+material = SubResource("Mat_shell")
+radius = 0.48
+height = 0.72
+
+[sub_resource type="SphereMesh" id="Mesh_rim"]
+material = SubResource("Mat_rim")
+radius = 0.50
+height = 0.40
+
+[sub_resource type="SphereMesh" id="Mesh_belly"]
+material = SubResource("Mat_skin")
+radius = 0.46
+height = 0.20
+
+[sub_resource type="CylinderMesh" id="Mesh_leg"]
+material = SubResource("Mat_skin")
+top_radius = 0.09
+bottom_radius = 0.10
+height = 0.22
+
+[sub_resource type="CylinderMesh" id="Mesh_neck"]
+material = SubResource("Mat_skin")
+top_radius = 0.07
+bottom_radius = 0.09
+height = 0.18
+
+[sub_resource type="SphereMesh" id="Mesh_head"]
+material = SubResource("Mat_skin")
+radius = 0.14
+height = 0.22
+
+[sub_resource type="SphereMesh" id="Mesh_eye"]
+material = SubResource("Mat_dark")
+radius = 0.03
+height = 0.04
+
+[sub_resource type="SphereMesh" id="Mesh_tail"]
+material = SubResource("Mat_skin")
+radius = 0.07
+height = 0.10
+
+; ── Collision ──────────────────────────────────────────────────────────────────
+[sub_resource type="CapsuleShape3D" id="Col"]
+radius = 0.50
+height = 0.90
+
+; ── Scene tree ─────────────────────────────────────────────────────────────────
+[node name="Stoneback" type="CharacterBody3D" groups=["roamers"]]
+floor_max_angle = 1.5707964
+floor_snap_length = 0.5
+script = ExtResource("1_stbk")
+
+; Shell dome — named Body so idle-bob animation applies to it
+; Scale: 1.10x in X, 0.64x in Y (flattened dome), 1.20x in Z (oval plan)
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.10, 0, 0, 0, 0.64, 0, 0, 0, 1.20, 0, 0.44, 0)
+mesh = SubResource("Mesh_shell")
+
+; Shell rim — dark flat band around base of dome
+; Very flat (Y scale 0.22), slightly wider than shell
+[node name="ShellRim" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.12, 0, 0, 0, 0.22, 0, 0, 0, 1.22, 0, 0.26, 0)
+mesh = SubResource("Mesh_rim")
+
+; Belly — flat skin plate underneath, flush with ground
+[node name="Belly" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.05, 0, 0, 0, 0.18, 0, 0, 0, 1.15, 0, 0.20, 0)
+mesh = SubResource("Mesh_belly")
+
+; Legs — four short stubby cylinders at the four corners
+[node name="FrontLegL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.11, -0.28)
+mesh = SubResource("Mesh_leg")
+
+[node name="FrontLegR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.11, -0.28)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.11, 0.28)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.11, 0.28)
+mesh = SubResource("Mesh_leg")
+
+; Neck — short, tilted ~20 deg forward, tucked under shell front edge
+; X rotation -20 deg: basis.y=(0, cos20, -sin20)=(0, 0.940, -0.342)
+;                     basis.z=(0, sin20,  cos20)=(0, 0.342,  0.940)
+[node name="Neck" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.940, -0.342, 0, 0.342, 0.940, 0, 0.30, -0.46)
+mesh = SubResource("Mesh_neck")
+
+; Head — peeking from the front of the shell
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.26, -0.60)
+mesh = SubResource("Mesh_head")
+
+; Eyes — tiny dark spheres, slightly elevated on head sides
+[node name="EyeL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.09, 0.31, -0.68)
+mesh = SubResource("Mesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.09, 0.31, -0.68)
+mesh = SubResource("Mesh_eye")
+
+; Tail — tiny skin-coloured bump at the back
+[node name="Tail" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0.52)
+mesh = SubResource("Mesh_tail")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44, 0)
+shape = SubResource("Col")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+billboard = 1
+no_depth_test = true
+text = "Stoneback"

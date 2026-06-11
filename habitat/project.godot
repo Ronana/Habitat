@@ -24,6 +24,8 @@ InventoryManager="*uid://dl14j51s37ici"
 WeatherManager="*uid://cd878p7bqsd75"
 WardenManager="*uid://d1sxvsspv0pty"
 SeasonManager="*uid://6ni2kio4bvno"
+AudioManager="*res://scripts/audio_manager.gd"
+ParticleManager="*res://scripts/particle_manager.gd"
 
 [physics]
 

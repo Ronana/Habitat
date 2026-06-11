@@ -1,0 +1,63 @@
+[gd_scene format=3 uid="uid://cosyburrow001"]
+
+[ext_resource type="Script" uid="uid://cd7aopwwcrix" path="res://scripts/shelter.gd" id="1_shelter"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mound"]
+albedo_color = Color(0.38, 0.28, 0.18, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_entrance"]
+albedo_color = Color(0.14, 0.10, 0.06, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grass"]
+albedo_color = Color(0.30, 0.50, 0.18, 1)
+roughness = 0.95
+
+[sub_resource type="SphereMesh" id="SphereMesh_mound"]
+material = SubResource("StandardMaterial3D_mound")
+radius = 0.9
+height = 1.1
+
+[sub_resource type="SphereMesh" id="SphereMesh_grass"]
+material = SubResource("StandardMaterial3D_grass")
+radius = 0.92
+height = 0.5
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_entrance"]
+material = SubResource("StandardMaterial3D_entrance")
+top_radius = 0.22
+bottom_radius = 0.25
+height = 0.30
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_col"]
+radius = 1.0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_interact"]
+size = Vector3(2.0, 1.5, 2.0)
+
+[node name="CosyBurrow" type="Node3D"]
+script = ExtResource("1_shelter")
+
+[node name="Mound" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("SphereMesh_mound")
+
+[node name="GrassTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, 0)
+mesh = SubResource("SphereMesh_grass")
+
+[node name="Entrance" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.18, 0.72)
+mesh = SubResource("CylinderMesh_entrance")
+
+[node name="ShelterBody" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShelterBody"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+shape = SubResource("SphereShape3D_col")
+
+[node name="InteractionArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractionArea"]
+shape = SubResource("BoxShape3D_interact")

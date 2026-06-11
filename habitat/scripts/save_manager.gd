@@ -9,7 +9,11 @@ func save_game(_garden: Node):
 			"dewdrops": CurrencyManager.dewdrops,
 			"eldermoss": CurrencyManager.eldermoss
 		},
-		
+		"warden": {
+			"level": WardenManager.current_level,
+			"xp": WardenManager.current_xp,
+			"xp_to_next": WardenManager.xp_to_next_level
+		},
 		"roamers": [],
 		"berry_bushes": []
 	}
@@ -110,6 +114,13 @@ func load_game(_garden: Node):
 	CurrencyManager.dewdrops = save_data["currency"]["dewdrops"]
 	CurrencyManager.eldermoss = save_data["currency"]["eldermoss"]
 	CurrencyManager.emit_signal("dewdrops_changed", CurrencyManager.dewdrops)
+
+	# Restore warden progression
+	if save_data.has("warden"):
+		WardenManager.current_level    = save_data["warden"]["level"]
+		WardenManager.current_xp       = save_data["warden"]["xp"]
+		WardenManager.xp_to_next_level = save_data["warden"]["xp_to_next"]
+		WardenManager.emit_signal("xp_gained", 0.0, WardenManager.current_xp)
 	
 	# Restore terrain
 	if save_data.has("terrain"):

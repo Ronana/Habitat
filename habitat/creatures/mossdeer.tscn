@@ -2,24 +2,73 @@
 
 [ext_resource type="Script" uid="uid://ww18feya0ucr" path="res://scripts/mossdeer.gd" id="1_24iji"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pe1he"]
-albedo_color = Color(0.54509807, 0.4509804, 0.33333334, 1)
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.56, 0.44, 0.28, 1)
+roughness = 0.92
 
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_pe1nj"]
-material = SubResource("StandardMaterial3D_pe1he")
-height = 1.6
+[sub_resource type="SphereMesh" id="Mesh_body"]
+material = SubResource("Mat_body")
+radius = 0.32
+height = 0.6
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1ravv"]
-albedo_color = Color(0.1764706, 0.3529412, 0.11764706, 1)
+[sub_resource type="StandardMaterial3D" id="Mat_belly"]
+albedo_color = Color(0.74, 0.64, 0.46, 1)
+roughness = 0.9
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_d5wfj"]
-material = SubResource("StandardMaterial3D_1ravv")
-top_radius = 0.05
-bottom_radius = 0.05
-height = 0.8
+[sub_resource type="SphereMesh" id="Mesh_belly"]
+material = SubResource("Mat_belly")
+radius = 0.22
+height = 0.38
 
-[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_aitnm"]
-height = 1.6
+[sub_resource type="CylinderMesh" id="Mesh_leg"]
+material = SubResource("Mat_body")
+top_radius = 0.07
+bottom_radius = 0.08
+height = 0.32
+
+[sub_resource type="CylinderMesh" id="Mesh_neck"]
+material = SubResource("Mat_body")
+top_radius = 0.09
+bottom_radius = 0.12
+height = 0.32
+
+[sub_resource type="SphereMesh" id="Mesh_head"]
+material = SubResource("Mat_body")
+radius = 0.2
+height = 0.34
+
+[sub_resource type="SphereMesh" id="Mesh_snout"]
+material = SubResource("Mat_belly")
+radius = 0.1
+height = 0.16
+
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.36, 0.26, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="SphereMesh" id="Mesh_nose"]
+material = SubResource("Mat_dark")
+radius = 0.04
+height = 0.06
+
+[sub_resource type="StandardMaterial3D" id="Mat_moss"]
+albedo_color = Color(0.2, 0.48, 0.15, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="Mesh_antler"]
+material = SubResource("Mat_moss")
+top_radius = 0.02
+bottom_radius = 0.04
+height = 0.4
+
+[sub_resource type="SphereMesh" id="Mesh_moss_tuft"]
+material = SubResource("Mat_moss")
+radius = 0.1
+height = 0.14
+
+[sub_resource type="CapsuleShape3D" id="Col"]
+radius = 0.32
+height = 1.3
 
 [node name="Mossdeer" type="CharacterBody3D" unique_id=1899289714 groups=["roamers"]]
 floor_max_angle = 1.5707964
@@ -27,19 +76,71 @@ floor_snap_length = 0.5
 script = ExtResource("1_24iji")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=843322906]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
-mesh = SubResource("CapsuleMesh_pe1nj")
+transform = Transform3D(1, 0, 0, 0, 0.78, 0, 0, 0, 1.45, 0, 0.5, 0)
+mesh = SubResource("Mesh_body")
 
-[node name="Antlers" type="MeshInstance3D" parent="." unique_id=766455163]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
-mesh = SubResource("CylinderMesh_d5wfj")
+[node name="Belly2" type="MeshInstance3D" parent="." unique_id=1079661634]
+transform = Transform3D(1.3864145, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3763332, 0.22873032)
+mesh = SubResource("Mesh_belly")
+
+[node name="Belly" type="MeshInstance3D" parent="." unique_id=2083530918]
+transform = Transform3D(1.4696846, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.36, -0.2)
+mesh = SubResource("Mesh_belly")
+
+[node name="FrontLegL" type="MeshInstance3D" parent="." unique_id=1586024436]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 0.16, -0.28)
+mesh = SubResource("Mesh_leg")
+
+[node name="FrontLegR" type="MeshInstance3D" parent="." unique_id=1618420945]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.16, -0.28)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegL" type="MeshInstance3D" parent="." unique_id=1652965737]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 0.16, 0.28)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegR" type="MeshInstance3D" parent="." unique_id=1838594330]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.16, 0.28)
+mesh = SubResource("Mesh_leg")
+
+[node name="Neck" type="MeshInstance3D" parent="." unique_id=836910199]
+transform = Transform3D(1, 0, 0, 0, 0.8311548, 0.5560446, 0, -0.5560446, 0.8311548, 0, 0.72, -0.44)
+mesh = SubResource("Mesh_neck")
+
+[node name="Head" type="MeshInstance3D" parent="." unique_id=290604200]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.88, -0.56)
+mesh = SubResource("Mesh_head")
+
+[node name="Snout" type="MeshInstance3D" parent="." unique_id=1998144384]
+transform = Transform3D(1, 0, 0, 0, 0.85, 0, 0, 0, 1.2, 0, 0.78, -0.72)
+mesh = SubResource("Mesh_snout")
+
+[node name="Nose" type="MeshInstance3D" parent="." unique_id=966098866]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.77, -0.82)
+mesh = SubResource("Mesh_nose")
+
+[node name="AntlerL" type="MeshInstance3D" parent="." unique_id=766455163]
+transform = Transform3D(0.8387778, -0.54415244, 0, 0.54415244, 0.8387778, 0, 0, 0, 1, -0.16, 1, -0.52)
+mesh = SubResource("Mesh_antler")
+
+[node name="AntlerR" type="MeshInstance3D" parent="." unique_id=1699152834]
+transform = Transform3D(0.8848549, 0.4654909, 0, -0.4654909, 0.8848549, 0, 0, 0, 1, 0.16, 1, -0.52)
+mesh = SubResource("Mesh_antler")
+
+[node name="MossTuftL" type="MeshInstance3D" parent="." unique_id=142285806]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.26, 1.18, -0.52)
+mesh = SubResource("Mesh_moss_tuft")
+
+[node name="MossTuftR" type="MeshInstance3D" parent="." unique_id=1573144011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.26, 1.18, -0.52)
+mesh = SubResource("Mesh_moss_tuft")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=385751821]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
-shape = SubResource("CapsuleShape3D_aitnm")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
+shape = SubResource("Col")
 
 [node name="NameLabel" type="Label3D" parent="." unique_id=979238424]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
 billboard = 1
 no_depth_test = true
 text = "Mossdeer"
