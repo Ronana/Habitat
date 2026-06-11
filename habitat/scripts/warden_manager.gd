@@ -59,6 +59,25 @@ func on_level_up(new_level: int):
 	if level_unlocks.has(new_level):
 		print("✨ Unlocked: ", level_unlocks[new_level])
 
+# Returns which of the given shop_items array should be visible at the current level.
+# Items with no "min_level" key are always available.
+func filter_shop_items(all_items: Array) -> Array:
+	var result = []
+	for item in all_items:
+		var min_lvl: int = item.get("min_level", 1)
+		if current_level >= min_lvl:
+			result.append(item)
+	return result
+
+# Returns locked items for display purposes (so the player can see what's coming).
+func get_locked_shop_items(all_items: Array) -> Array:
+	var result = []
+	for item in all_items:
+		var min_lvl: int = item.get("min_level", 1)
+		if current_level < min_lvl:
+			result.append(item)
+	return result
+
 func get_level_progress() -> float:
 	return current_xp / xp_to_next_level
 

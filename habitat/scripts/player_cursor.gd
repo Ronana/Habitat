@@ -109,6 +109,7 @@ func try_interact_with_trader():
 		var node = result.collider
 		while node:
 			if node.name == "Maren":
+				node.show_selection_ring()
 				roamer_ui.open_shop(node)
 				return
 			node = node.get_parent()

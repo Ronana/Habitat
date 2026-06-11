@@ -29,6 +29,92 @@ var roamer_discovery_notes = {
 func _ready():
 	close_button.pressed.connect(close_journal)
 	journal_panel.visible = false
+	_apply_theme()
+
+# ── Theme ─────────────────────────────────────────────────────────────────────
+const C_BG       := Color(0.07, 0.11, 0.07, 0.95)
+const C_BORDER   := Color(0.28, 0.46, 0.22, 1.00)
+const C_TEXT     := Color(0.93, 0.91, 0.82, 1.00)
+const C_MUTED    := Color(0.62, 0.72, 0.52, 1.00)
+const C_ACCENT   := Color(0.52, 0.82, 0.32, 1.00)
+const C_HEADER   := Color(0.78, 0.90, 0.60, 1.00)
+const C_BTN_NORM := Color(0.14, 0.24, 0.11, 1.00)
+const C_BTN_HOV  := Color(0.22, 0.38, 0.17, 1.00)
+const C_BTN_PRS  := Color(0.08, 0.15, 0.06, 1.00)
+
+func _make_panel_style() -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = C_BG
+	s.border_color = C_BORDER
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(8)
+	s.set_content_margin_all(12)
+	return s
+
+func _make_side_style() -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = Color(0.05, 0.09, 0.05, 0.95)
+	s.border_color = C_BORDER
+	s.set_border_width_all(0)
+	s.border_width_right = 2
+	s.set_corner_radius_all(0)
+	s.set_content_margin_all(10)
+	return s
+
+func _make_btn_style(bg: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg
+	s.border_color = C_BORDER
+	s.set_border_width_all(1)
+	s.set_corner_radius_all(5)
+	s.set_content_margin_all(6)
+	return s
+
+func _style_btn(btn: Button, accent: bool = false):
+	btn.add_theme_stylebox_override("normal",  _make_btn_style(C_BTN_NORM))
+	btn.add_theme_stylebox_override("hover",   _make_btn_style(C_BTN_HOV))
+	btn.add_theme_stylebox_override("pressed", _make_btn_style(C_BTN_PRS))
+	btn.add_theme_color_override("font_color",         C_TEXT if not accent else C_ACCENT)
+	btn.add_theme_color_override("font_hover_color",   C_ACCENT)
+	btn.add_theme_color_override("font_pressed_color", C_TEXT)
+
+func _style_lbl(lbl: Label, size: int, color: Color):
+	lbl.add_theme_font_size_override("font_size", size)
+	lbl.add_theme_color_override("font_color", color)
+
+func _apply_theme():
+	# Main panel background
+	journal_panel.add_theme_stylebox_override("panel", _make_panel_style())
+
+	# Left sidebar — slightly darker strip
+	var left = $JournalPanel/HBoxContainer/LeftPanel
+	# Title
+	var title_lbl = $JournalPanel/HBoxContainer/LeftPanel/JournalTitle
+	_style_lbl(title_lbl, 17, C_ACCENT)
+
+	# Right panel labels
+	_style_lbl(entry_name,      20, C_ACCENT)
+	_style_lbl(entry_stage,     13, C_HEADER)
+	_style_lbl(stage_hint,      12, C_MUTED)
+	_style_lbl(entry_happiness, 13, C_TEXT)
+	_style_lbl(needs_detail,    12, C_TEXT)
+	_style_lbl(family_detail,   12, C_MUTED)
+
+	# Section header labels
+	var disc_hdr = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/EntryDiscovery
+	var tips_hdr = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/EntryTips
+	var needs_hdr = $JournalPanel/HBoxContainer/RightPanel/ScrollContainer/VBoxContainer/EntryNeeds
+	_style_lbl(disc_hdr,  12, C_HEADER)
+	_style_lbl(tips_hdr,  12, C_HEADER)
+	_style_lbl(needs_hdr, 12, C_HEADER)
+	_style_lbl(discovery_detail, 12, C_TEXT)
+	discovery_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_style_lbl(tips_detail, 12, C_MUTED)
+	tips_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+	# Close button
+	_style_btn(close_button)
+	close_button.custom_minimum_size = Vector2(200, 36)
 
 func _input(event):
 	if event is InputEventKey and event.pressed:
@@ -77,13 +163,13 @@ func refresh_journal():
 		return
 
 	for roamer in roamers:
-		var display_name = roamer.name
 		var btn = Button.new()
-		btn.text = display_name
+		var stage_icons = ["👀", "🚶", "🏠", "💚"]
+		btn.text = stage_icons[roamer.attraction_stage] + " " + roamer.name
 		btn.custom_minimum_size = Vector2(200, 40)
 		btn.pressed.connect(_on_roamer_selected.bind(roamer))
+		_style_btn(btn)
 		roamer_list.add_child(btn)
-		print("Added button for: ", roamer.name)
 		
 	
 
@@ -99,12 +185,23 @@ func _on_roamer_selected(roamer):
 	else:
 		entry_happiness.text = "Happiness: " + str(int(roamer.happiness * 100)) + "% (Needs shelter)"
 
-	# Build needs string
+	# Build needs string with colour-coded bars
 	var needs_text = ""
+	var worst_val := 1.0
 	for need in roamer.needs:
-		var bar = _make_bar(roamer.needs[need])
-		needs_text += need.capitalize() + ": " + bar + " " + str(int(roamer.needs[need] * 100)) + "%\n"
-	needs_detail.text = needs_text
+		var val: float = roamer.needs[need]
+		if val < worst_val:
+			worst_val = val
+		var bar = _make_bar(val)
+		needs_text += need.capitalize() + ": " + bar + "  " + str(int(val * 100)) + "%\n"
+	needs_detail.text = needs_text.strip_edges()
+	# Colour the whole needs block by the worst need
+	if worst_val < 0.3:
+		needs_detail.add_theme_color_override("font_color", Color(0.95, 0.35, 0.25, 1.0))
+	elif worst_val < 0.6:
+		needs_detail.add_theme_color_override("font_color", Color(0.95, 0.75, 0.20, 1.0))
+	else:
+		needs_detail.add_theme_color_override("font_color", Color(0.52, 0.82, 0.32, 1.0))
 
 	family_detail.text = _get_family_text(roamer)
 

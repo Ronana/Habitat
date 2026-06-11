@@ -23,15 +23,15 @@ func hatch():
 		queue_free()
 		return
 	var creature = creature_scene.instantiate()
-	get_parent().add_child(creature)
-	creature.global_position = global_position + Vector3(0, 1.0, 0)
-
-	# Stamp family data — creature starts as a child, can't breed until grown
+	# Stamp family data before add_child so _ready() doesn't overwrite roamer_uid
+	creature.roamer_uid = str(Time.get_ticks_msec()) + "_" + str(randi())
 	creature.is_adult = false
 	creature.parent_a_id = parent_a_id
 	creature.parent_b_id = parent_b_id
 	creature.family_id = family_id
 	creature.scale = Vector3(0.6, 0.6, 0.6)
+	get_parent().add_child(creature)
+	creature.global_position = global_position + Vector3(0, 1.0, 0)
 
 	CurrencyManager.add_dewdrops(15.0)
 	WardenManager.gain_xp("egg_hatched")

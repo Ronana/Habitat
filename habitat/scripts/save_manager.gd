@@ -41,7 +41,14 @@ func save_game(_garden: Node):
 				"z": roamer.global_position.z
 			},
 			"stage": roamer.attraction_stage,
-			"needs": roamer.needs
+			"needs": roamer.needs,
+			"happiness": roamer.happiness,
+			"roamer_uid": roamer.roamer_uid,
+			"is_adult": roamer.is_adult,
+			"grow_up_timer": roamer.grow_up_timer,
+			"family_id": roamer.family_id,
+			"parent_a_id": roamer.parent_a_id,
+			"parent_b_id": roamer.parent_b_id
 		})
 	
 	# Save all berry bushes
@@ -142,6 +149,15 @@ func load_game(_garden: Node):
 		if scene:
 			var roamer = scene.instantiate()
 			roamer.name = roamer_data["name"]
+			# Stamp saved IDs before add_child so _ready() doesn't overwrite roamer_uid
+			roamer.roamer_uid = roamer_data.get("roamer_uid", "")
+			roamer.is_adult = roamer_data.get("is_adult", true)
+			roamer.grow_up_timer = roamer_data.get("grow_up_timer", 0.0)
+			roamer.family_id = roamer_data.get("family_id", "")
+			roamer.parent_a_id = roamer_data.get("parent_a_id", "")
+			roamer.parent_b_id = roamer_data.get("parent_b_id", "")
+			if not roamer.is_adult:
+				roamer.scale = Vector3(0.6, 0.6, 0.6)
 			_garden.add_child(roamer)
 			roamer.global_position = Vector3(
 				roamer_data["position"]["x"],
@@ -150,6 +166,7 @@ func load_game(_garden: Node):
 			)
 			roamer.attraction_stage = roamer_data["stage"]
 			roamer.needs = roamer_data["needs"]
+			roamer.happiness = roamer_data.get("happiness", 1.0)
 	
 	# Restore berry bushes
 	var bush_scene = load("res://scenes/berry_bush.tscn")
@@ -162,7 +179,7 @@ func load_game(_garden: Node):
 			bush_data["position"]["z"]
 		)
 		
-	# Restore shelters
+	# Restore shelters and re-link to their roamers
 	if save_data.has("shelters"):
 		var shelter_scene = load("res://scenes/shelter.tscn")
 		for shelter_data in save_data["shelters"]:
@@ -173,7 +190,16 @@ func load_game(_garden: Node):
 				shelter_data["position"]["y"],
 				shelter_data["position"]["z"]
 			)
-	
+			var assigned_name = shelter_data.get("assigned_roamer", "")
+			if assigned_name != "":
+				for roamer in get_tree().get_nodes_in_group("roamers"):
+					if roamer.name == assigned_name:
+						shelter.is_occupied = true
+						shelter.assigned_roamer = roamer
+						roamer.has_shelter = true
+						roamer.shelter_node = shelter
+						break
+
 	print("Game loaded successfully!")
 	return true
 

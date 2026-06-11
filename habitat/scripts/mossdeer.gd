@@ -10,13 +10,12 @@ func _ready():
 	super._ready()
 
 func on_selected():
+	super.on_selected()
+	# Tint emission green to distinguish from GlowFox
 	var body = get_node("Body")
-	var mat = body.get_active_material(0)
-	mat.emission_enabled = true
-	mat.emission = Color(0.2, 0.8, 0.2)
-	mat.emission_energy_multiplier = 2.0
+	var mat = body.get_surface_override_material(0)
+	if mat:
+		mat.emission = Color(0.2, 0.85, 0.2)
 
 func on_deselected():
-	var body = get_node("Body")
-	var mat = body.get_active_material(0)
-	mat.emission_enabled = false
+	super.on_deselected()

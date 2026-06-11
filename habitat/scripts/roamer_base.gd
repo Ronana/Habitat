@@ -7,6 +7,8 @@ enum BreedPhase { NONE, APPROACHING, GOING_TO_SHELTER, INSIDE, EXITING }
 @export var species_id: String = ""
 @export var creature_scene_path: String = ""
 
+var roamer_uid: String = ""
+
 var state = State.WANDERING
 var attraction_stage = AttractionStage.APPEARS
 var wander_target: Vector3
@@ -49,19 +51,63 @@ var needs = {
 	"space": 1.0
 }
 
-# How fast each need depletes per second
+# How fast each need depletes per second (base rates)
 var need_decay = {
 	"food": 0.01,
-	"safety": 0.0,
-	"space": 0.0
+	"safety": 0.004,  # ~4 min to drain without shelter
+	"space": 0.002    # ~8 min baseline; scales with crowding
 }
 
 var happiness: float = 1.0
 
+var selection_ring: MeshInstance3D = null
+var _ring_pulse_timer: float = 0.0
+
 func _ready():
 	floor_snap_length = 0.5
 	floor_max_angle = deg_to_rad(45)
+	if roamer_uid == "":
+		roamer_uid = str(get_instance_id())
+	add_to_group("roamers")
+	_create_selection_ring()
 	pick_wander_target()
+
+func _create_selection_ring():
+	selection_ring = MeshInstance3D.new()
+	selection_ring.position = Vector3(0.0, 0.05, 0.0)
+	selection_ring.mesh = _build_ring_mesh(0.74, 1.0, 48)
+	var mat = StandardMaterial3D.new()
+	mat.shading_mode           = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency           = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test          = true
+	mat.emission_enabled       = true
+	mat.albedo_color           = Color(0.85, 0.95, 1.0, 0.55)
+	mat.emission               = Color(0.7, 0.88, 1.0)
+	mat.emission_energy_multiplier = 1.2
+	selection_ring.set_surface_override_material(0, mat)
+	selection_ring.visible = false
+	add_child(selection_ring)
+
+func _build_ring_mesh(inner_r: float, outer_r: float, segments: int) -> ArrayMesh:
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_normal(Vector3.UP)
+	for i in range(segments):
+		var a1 = (float(i)     / segments) * TAU
+		var a2 = (float(i + 1) / segments) * TAU
+		var p1i = Vector3(cos(a1) * inner_r, 0.0, sin(a1) * inner_r)
+		var p1o = Vector3(cos(a1) * outer_r, 0.0, sin(a1) * outer_r)
+		var p2i = Vector3(cos(a2) * inner_r, 0.0, sin(a2) * inner_r)
+		var p2o = Vector3(cos(a2) * outer_r, 0.0, sin(a2) * outer_r)
+		st.add_vertex(p1o); st.add_vertex(p2o); st.add_vertex(p1i)
+		st.add_vertex(p2o); st.add_vertex(p2i); st.add_vertex(p1i)
+	return st.commit()
+
+func _process(delta):
+	if selection_ring and selection_ring.visible:
+		_ring_pulse_timer += delta
+		var pulse = 1.0 + 0.05 * sin(_ring_pulse_timer * 3.2)
+		selection_ring.scale = Vector3(pulse, 1.0, pulse)
 
 func _physics_process(delta):
 	if not is_on_floor():
@@ -219,7 +265,7 @@ func _complete_bond():
 
 	# Assign family IDs
 	if family_id == "":
-		var ids = [str(get_instance_id()), str(mate.get_instance_id() if mate else "")]
+		var ids = [roamer_uid, mate.roamer_uid if mate and is_instance_valid(mate) else ""]
 		ids.sort()
 		family_id = "_".join(ids)
 	if mate and is_instance_valid(mate) and mate.family_id == "":
@@ -233,8 +279,8 @@ func _complete_bond():
 	if egg_scene:
 		var egg = egg_scene.instantiate()
 		egg.creature_scene_path = creature_scene_path
-		egg.parent_a_id = str(get_instance_id())
-		egg.parent_b_id = str(mate.get_instance_id()) if mate and is_instance_valid(mate) else ""
+		egg.parent_a_id = roamer_uid
+		egg.parent_b_id = mate.roamer_uid if mate and is_instance_valid(mate) else ""
 		egg.family_id = family_id
 		get_parent().add_child(egg)
 		egg.global_position = spawn_pos + Vector3(0, 0.3, 0)
@@ -352,8 +398,20 @@ func seek_nearest_food():
 		print(name, " is seeking food!")
 
 func update_needs(delta):
-	for need in needs:
-		needs[need] = max(0.0, needs[need] - need_decay[need] * delta)
+	# Food — straight decay
+	needs["food"] = max(0.0, needs["food"] - need_decay["food"] * delta)
+
+	# Safety — decays normally; shelter restores it passively
+	if has_shelter and is_instance_valid(shelter_node):
+		# Shelter present: restore safety faster than it decays
+		needs["safety"] = min(1.0, needs["safety"] + 0.008 * delta)
+	else:
+		needs["safety"] = max(0.0, needs["safety"] - need_decay["safety"] * delta)
+
+	# Space — decays faster the more roamers are in the garden
+	var roamer_count: int = get_tree().get_nodes_in_group("roamers").size()
+	var crowding_factor: float = clamp(float(roamer_count) / 6.0, 0.5, 3.0)
+	needs["space"] = max(0.0, needs["space"] - need_decay["space"] * crowding_factor * delta)
 
 func update_happiness():
 	var total = 0.0
@@ -430,12 +488,17 @@ func check_stage_progress():
 
 func on_selected():
 	var body = get_node("Body")
-	var mat = body.get_active_material(0)
-	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.6, 0.1)
-	mat.emission_energy_multiplier = 2.0
+	var unique_mat = body.get_active_material(0).duplicate()
+	unique_mat.emission_enabled = true
+	unique_mat.emission = Color(1.0, 0.6, 0.1)
+	unique_mat.emission_energy_multiplier = 2.0
+	body.set_surface_override_material(0, unique_mat)
+	if selection_ring:
+		selection_ring.visible = true
+		_ring_pulse_timer = 0.0
 
 func on_deselected():
 	var body = get_node("Body")
-	var mat = body.get_active_material(0)
-	mat.emission_enabled = false
+	body.set_surface_override_material(0, null)
+	if selection_ring:
+		selection_ring.visible = false

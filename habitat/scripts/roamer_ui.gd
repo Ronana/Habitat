@@ -6,6 +6,10 @@ extends CanvasLayer
 @onready var currency_label = $Panel/VBoxContainer/CurrencyLabel
 @onready var shop_panel = $ShopPanel
 @onready var shop_dewdrops = $ShopPanel/VBoxContainer/DewdropsLabel
+@onready var shop_feedback = $ShopPanel/VBoxContainer/FeedbackLabel
+@onready var shop_item_container = $ShopPanel/VBoxContainer/ItemContainer
+@onready var placement_label = $Panel/VBoxContainer/PlacementLabel
+@onready var attraction_hints = $Panel/VBoxContainer/AttractionHints
 @onready var inventory_panel = $InventoryPanel
 @onready var item_list = $InventoryPanel/VBoxContainer/ItemList
 @onready var ToolManager_ref = get_tree().get_root().get_node("Garden/ToolManager")
@@ -16,6 +20,7 @@ extends CanvasLayer
 
 var tracked_roamer = null
 var current_trader = null
+var _attraction_hint_timer: float = 0.0
 
 func _ready():
 	CurrencyManager.dewdrops_changed.connect(_on_dewdrops_changed)
@@ -29,26 +34,135 @@ func _ready():
 	SeasonManager.season_changed.connect(_on_season_changed)
 	SeasonManager.day_passed.connect(_on_day_passed)
 	update_season_ui()
-	# Connect shop buttons
-	$ShopPanel/VBoxContainer/Item0.pressed.connect(_on_buy_item.bind(0))
-	$ShopPanel/VBoxContainer/Item1.pressed.connect(_on_buy_item.bind(1))
-	$ShopPanel/VBoxContainer/Item2.pressed.connect(_on_buy_item.bind(2))
-	$ShopPanel/VBoxContainer/Item3.pressed.connect(_on_buy_item.bind(3))
 	$ShopPanel/VBoxContainer/CloseButton.pressed.connect(close_shop)
 	$Panel/VBoxContainer/SaveButton.pressed.connect(_on_save)
 	$Panel/VBoxContainer/LoadButton.pressed.connect(_on_load)
 	$Panel/VBoxContainer/JournalButton.pressed.connect(_on_journal_button)
-	$ShopPanel/VBoxContainer/Item4.pressed.connect(_on_buy_item.bind(4))
-	print("SeasonLabel found: ", has_node("Panel/VBoxContainer/SeasonLabel"))
+	_apply_theme()
+
+# ── Theme ─────────────────────────────────────────────────────────────────────
+const C_BG        := Color(0.07, 0.11, 0.07, 0.90)
+const C_BORDER     := Color(0.28, 0.46, 0.22, 1.00)
+const C_TEXT       := Color(0.93, 0.91, 0.82, 1.00)
+const C_MUTED      := Color(0.62, 0.72, 0.52, 1.00)
+const C_ACCENT     := Color(0.52, 0.82, 0.32, 1.00)
+const C_BTN_NORM   := Color(0.14, 0.24, 0.11, 1.00)
+const C_BTN_HOVER  := Color(0.22, 0.38, 0.17, 1.00)
+const C_BTN_PRESS  := Color(0.08, 0.15, 0.06, 1.00)
+
+func _make_panel_style(bg: Color = C_BG, border: Color = C_BORDER) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg
+	s.border_color = border
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(8)
+	s.set_content_margin_all(10)
+	return s
+
+func _make_btn_style(bg: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg
+	s.border_color = C_BORDER
+	s.set_border_width_all(1)
+	s.set_corner_radius_all(5)
+	s.set_content_margin_all(6)
+	return s
+
+func _style_button(btn: Button):
+	btn.add_theme_stylebox_override("normal",   _make_btn_style(C_BTN_NORM))
+	btn.add_theme_stylebox_override("hover",    _make_btn_style(C_BTN_HOVER))
+	btn.add_theme_stylebox_override("pressed",  _make_btn_style(C_BTN_PRESS))
+	btn.add_theme_color_override("font_color",  C_TEXT)
+	btn.add_theme_color_override("font_hover_color",   C_ACCENT)
+	btn.add_theme_color_override("font_pressed_color", C_TEXT)
+
+func _style_bar(bar: ProgressBar, fill: Color):
+	var fill_style := StyleBoxFlat.new()
+	fill_style.bg_color = fill
+	fill_style.set_corner_radius_all(4)
+	var bg_style := StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.10, 0.16, 0.08, 1.0)
+	bg_style.set_corner_radius_all(4)
+	bar.add_theme_stylebox_override("fill", fill_style)
+	bar.add_theme_stylebox_override("background", bg_style)
+	bar.add_theme_color_override("font_color", Color(0, 0, 0, 0))  # hide default % text
+
+func _style_label(lbl: Label, size: int = 13, color: Color = C_TEXT):
+	lbl.add_theme_font_size_override("font_size", size)
+	lbl.add_theme_color_override("font_color", color)
+
+func _apply_theme():
+	# Panels
+	var panel_style = _make_panel_style()
+	for panel in get_tree().get_nodes_in_group("ui_panels"):
+		panel.add_theme_stylebox_override("panel", panel_style)
+
+	# VBox separation
+	for vbox in [$Panel/VBoxContainer, $ShopPanel/VBoxContainer,
+				 $InventoryPanel/VBoxContainer, $WardenPanel/VBoxContainer]:
+		vbox.add_theme_constant_override("separation", 5)
+
+	# ── Main panel labels ──────────────────────────────────────────────────────
+	_style_label($Panel/VBoxContainer/RoamerName, 15, C_ACCENT)
+	_style_label($Panel/VBoxContainer/StageLabel, 12, C_MUTED)
+	_style_label($Panel/VBoxContainer/FoodLabel,  11, C_MUTED)
+	_style_label($Panel/VBoxContainer/CurrencyLabel, 13, Color(0.55, 0.85, 1.0, 1.0))
+	_style_label($Panel/VBoxContainer/ToolLabel,  11, C_MUTED)
+	_style_label($Panel/VBoxContainer/ClockLabel, 12, C_TEXT)
+	_style_label($Panel/VBoxContainer/WeatherLabel, 12, C_TEXT)
+	_style_label($Panel/VBoxContainer/SeasonLabel,  12, Color(0.95, 0.80, 0.50, 1.0))
+	_style_label($Panel/VBoxContainer/PlacementLabel, 11, C_ACCENT)
+	_style_label($Panel/VBoxContainer/AttractionTitle, 12, Color(0.85, 0.95, 0.65, 1.0))
+	$Panel/VBoxContainer/AttractionTitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	$Panel/VBoxContainer/AttractionTitle.custom_minimum_size = Vector2(220, 0)
+	_style_label($Panel/VBoxContainer/AttractionHints, 10, C_MUTED)
+
+	# Food bar — amber
+	_style_bar(food_bar, Color(0.90, 0.65, 0.20, 1.0))
+
+	# Main panel buttons
+	_style_button($Panel/VBoxContainer/SaveButton)
+	_style_button($Panel/VBoxContainer/LoadButton)
+	_style_button($Panel/VBoxContainer/JournalButton)
+
+	# ── Shop panel ─────────────────────────────────────────────────────────────
+	_style_label($ShopPanel/VBoxContainer/ShopTitle, 16, C_ACCENT)
+	_style_label($ShopPanel/VBoxContainer/DewdropsLabel, 13, Color(0.55, 0.85, 1.0, 1.0))
+	_style_label($ShopPanel/VBoxContainer/FeedbackLabel, 12, C_TEXT)
+	_style_button($ShopPanel/VBoxContainer/CloseButton)
+
+	# ── Inventory panel ────────────────────────────────────────────────────────
+	_style_label($InventoryPanel/VBoxContainer/InventoryTitle, 14, C_ACCENT)
+
+	# ── Warden panel ───────────────────────────────────────────────────────────
+	_style_label(warden_title, 14, C_ACCENT)
+	_style_label(level_label,  13, C_TEXT)
+	_style_label(xp_label,     11, C_MUTED)
+	# XP bar — bright green
+	_style_bar(xp_bar, Color(0.45, 0.80, 0.28, 1.0))
 	
 	
 
-func _process(_delta):
+func _process(delta):
 	if tracked_roamer:
 		update_ui()
-		
-	# Day/Night Cycle
 	$Panel/VBoxContainer/ClockLabel.text = "🕐 " + DayNightManager.get_time_string()
+
+	# Update attraction hints every 3 seconds to avoid per-frame work
+	_attraction_hint_timer += delta
+	if _attraction_hint_timer >= 3.0:
+		_attraction_hint_timer = 0.0
+		_update_attraction_hints()
+
+func _update_attraction_hints():
+	var garden = get_tree().get_root().get_node_or_null("Garden")
+	if not garden:
+		return
+	if garden.has_method("get_objective_hint"):
+		$Panel/VBoxContainer/AttractionTitle.text = garden.get_objective_hint()
+	if garden.has_method("get_attraction_hints"):
+		var hints: Array = garden.get_attraction_hints()
+		attraction_hints.text = "\n".join(hints)
 
 func show_roamer(roamer):
 	tracked_roamer = roamer
@@ -74,16 +188,73 @@ func update_currency():
 func open_shop(trader):
 	current_trader = trader
 	shop_panel.visible = true
-	shop_dewdrops.text = "Dewdrops: " + str(snappedf(CurrencyManager.dewdrops, 0.1))
+	shop_feedback.text = ""
+	_rebuild_shop_buttons()
+	_update_shop_dewdrops()
+
+func _rebuild_shop_buttons():
+	for child in shop_item_container.get_children():
+		child.queue_free()
+	if not current_trader:
+		return
+	var all_items = current_trader.shop_items
+	# Unlocked items — fully interactive
+	for i in range(all_items.size()):
+		var item = all_items[i]
+		if WardenManager.current_level < item.get("min_level", 1):
+			continue
+		var vbox = VBoxContainer.new()
+		var btn = Button.new()
+		btn.text = item["name"] + "  —  " + str(item["cost"]) + " 💧"
+		btn.custom_minimum_size = Vector2(260, 36)
+		btn.pressed.connect(_on_buy_item.bind(i))
+		_style_button(btn)
+		var desc = Label.new()
+		desc.text = item["description"]
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.custom_minimum_size = Vector2(260, 0)
+		_style_label(desc, 11, C_MUTED)
+		vbox.add_child(btn)
+		vbox.add_child(desc)
+		shop_item_container.add_child(vbox)
+	# Locked items — shown greyed with level requirement
+	for item in all_items:
+		var min_lvl: int = item.get("min_level", 1)
+		if WardenManager.current_level >= min_lvl:
+			continue
+		var vbox = VBoxContainer.new()
+		var lbl = Label.new()
+		lbl.text = "🔒 " + item["name"] + "  —  Lv." + str(min_lvl)
+		lbl.modulate = Color(0.55, 0.55, 0.55, 1.0)
+		lbl.custom_minimum_size = Vector2(260, 36)
+		vbox.add_child(lbl)
+		shop_item_container.add_child(vbox)
+
+func _update_shop_dewdrops():
+	shop_dewdrops.text = "💧 " + str(int(CurrencyManager.dewdrops)) + " Dewdrops"
 
 func close_shop():
+	if current_trader and current_trader.has_method("hide_selection_ring"):
+		current_trader.hide_selection_ring()
 	shop_panel.visible = false
 	current_trader = null
 
 func _on_buy_item(index: int):
-	if current_trader:
+	if not current_trader:
+		return
+	var item = current_trader.shop_items[index]
+	if CurrencyManager.dewdrops >= item["cost"]:
 		current_trader.buy_item(index)
-		shop_dewdrops.text = "Dewdrops: " + str(snappedf(CurrencyManager.dewdrops, 0.1))
+		_update_shop_dewdrops()
+		_show_shop_feedback("Purchased: " + item["name"] + "!", Color(0.3, 0.9, 0.3))
+	else:
+		_show_shop_feedback("Not enough Dewdrops! (need " + str(int(item["cost"])) + ")", Color(1, 0.3, 0.3))
+
+func _show_shop_feedback(msg: String, colour: Color):
+	shop_feedback.text = msg
+	shop_feedback.modulate = colour
+	await get_tree().create_timer(2.5).timeout
+	shop_feedback.text = ""
 
 func _on_save():
 	SaveManager.save_game(get_tree().get_root().get_node("Garden"))
@@ -110,23 +281,32 @@ func update_inventory_ui():
 		var btn = Button.new()
 		btn.text = item_name + " x" + str(items[item_name])
 		btn.pressed.connect(_on_inventory_item_pressed.bind(item_name))
+		_style_button(btn)
 		item_list.add_child(btn)
 
 func _on_inventory_item_pressed(item_name: String):
+	if item_name == "Roamer Treat":
+		use_roamer_treat()
+		return
 	if item_name == "Fresh Berries":
-		use_fresh_berries()
+		use_roamer_treat_named("Fresh Berries")
 		return
 	# Set as active placement item
 	ToolManager_ref.set_placement_item(item_name)
-	print("Selected for placement: ", item_name)
-	
-func use_fresh_berries():
+	placement_label.text = "📦 Placing: " + item_name + "  (right-click to place)"
+
+func use_roamer_treat():
+	use_roamer_treat_named("Roamer Treat")
+
+func use_roamer_treat_named(item_name: String):
 	if not tracked_roamer:
-		print("Select a Roamer first!")
+		placement_label.text = "⚠ Select a Roamer first!"
+		placement_label.modulate = Color(1, 0.6, 0.2)
 		return
-	if InventoryManager.remove_item("Fresh Berries"):
+	if InventoryManager.remove_item(item_name):
 		tracked_roamer.feed(0.5)
-		print("Fed fresh berries to ", tracked_roamer.name)
+		placement_label.text = "🍓 Fed " + item_name + " to " + tracked_roamer.name
+		placement_label.modulate = Color(0.4, 0.9, 0.4)
 		
 func _on_weather_changed(new_weather):
 	update_weather_ui()

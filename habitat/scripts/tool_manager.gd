@@ -9,6 +9,7 @@ var raise_terrain: bool = true
 var original_material: Material
 var placement_item: String = ""
 var berry_bush_scene: PackedScene = preload("res://scenes/berry_bush.tscn")
+var tree_scene: PackedScene = preload("res://scenes/tree.tscn")
 var base_level: float = 0.0
 var max_dig_depth: float = -2.0
 var can_raise_terrain: bool = false
@@ -17,6 +18,7 @@ var mesh_data_tool: MeshDataTool
 var array_mesh: ArrayMesh
 var starter_area_size: float = 40.0
 var shelter_scene: PackedScene = preload("res://scenes/shelter.tscn")
+var _terrain_mat: ShaderMaterial = null
 
 func _ready():
 	ground_mesh = get_parent().get_node("Ground")
@@ -24,6 +26,7 @@ func _ready():
 	await get_tree().process_frame
 	build_mesh_data_tool()
 	apply_terrain_colours()
+	snap_all_statics()
 	print("Mesh data tool built successfully")
 
 func build_mesh_data_tool():
@@ -79,22 +82,34 @@ func place_item():
 	var result = space_state.intersect_ray(query)
 	
 	if result:
+		var placed = false
 		match placement_item:
 			"Berry Seeds":
 				if InventoryManager.remove_item("Berry Seeds"):
 					var bush = berry_bush_scene.instantiate()
 					get_parent().add_child(bush)
 					bush.global_position = result.position
-					print("Berry bush planted!")
-					placement_item = ""
+					WardenManager.gain_xp("bush_planted")
+					placed = true
+			"Oak Sapling":
+				if InventoryManager.remove_item("Oak Sapling"):
+					var tree = tree_scene.instantiate()
+					get_parent().add_child(tree)
+					tree.global_position = result.position
+					WardenManager.gain_xp("bush_planted")
+					placed = true
 			"Basic Shelter":
 				if InventoryManager.remove_item("Basic Shelter"):
 					var shelter = shelter_scene.instantiate()
 					get_parent().add_child(shelter)
 					shelter.global_position = result.position
-					print("Shelter placed!")
 					WardenManager.gain_xp("bush_planted")
-					placement_item = ""
+					placed = true
+		if placed:
+			placement_item = ""
+			var ui = get_parent().get_node_or_null("RoamerUI")
+			if ui:
+				ui.placement_label.text = ""
 
 
 func use_spade():
@@ -150,53 +165,62 @@ func deform_terrain(hit_pos: Vector3):
 	ground_mesh.mesh = array_mesh.duplicate()
 	apply_terrain_colours()
 	update_ground_collision()
-	
+	snap_all_statics()
+	# Immediately re-conform the boundary to the new terrain shape
+	var garden = get_parent()
+	if garden.has_method("update_boundary_heights"):
+		garden.update_boundary_heights()
+
 func set_placement_item(item_name: String):
 	placement_item = item_name
 	print("Ready to place: ", item_name)
 
 func apply_terrain_colours():
-	
-	
-	var surface_tool = SurfaceTool.new()
-	var mdt = MeshDataTool.new()
-	var temp_mesh = ArrayMesh.new()
-	temp_mesh.add_surface_from_arrays(
-		Mesh.PRIMITIVE_TRIANGLES,
-		ground_mesh.mesh.surface_get_arrays(0)
-	)
-	mdt.create_from_surface(temp_mesh, 0)
-	
-	# Colour each vertex based on height
-	for i in range(mdt.get_vertex_count()):
-		var vertex = mdt.get_vertex(i)
+	# Read vertex positions from the current (deformed) mesh
+	var src_arrays = ground_mesh.mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = src_arrays[Mesh.ARRAY_VERTEX]
+	var indices: PackedInt32Array    = src_arrays[Mesh.ARRAY_INDEX]
+
+	# Compute height-based vertex colour for each vertex
+	var vert_colors: Array[Color] = []
+	vert_colors.resize(vertices.size())
+	for i in range(vertices.size()):
+		var y := vertices[i].y
 		var colour: Color
-		
-		if vertex.y > 0.1:
-			# Above ground — starts bright green, gets very dark green at peak
-			var t = clamp(vertex.y / 1.5, 0.0, 1.0)
+		if y > 0.1:
+			var t: float = clamp(y / 1.5, 0.0, 1.0)
 			colour = Color(0.35, 0.50, 0.20).lerp(Color(0.08, 0.18, 0.05), t)
-		elif vertex.y < -0.1:
-			# Below ground — starts light dirt, gets very dark soil at depth
-			var t = clamp(abs(vertex.y) / 2.0, 0.0, 1.0)
+		elif y < -0.1:
+			var t: float = clamp(abs(y) / 2.0, 0.0, 1.0)
 			colour = Color(0.55, 0.40, 0.22).lerp(Color(0.18, 0.10, 0.05), t)
 		else:
-			# At ground level — base green
 			colour = Color(0.29, 0.36, 0.18)
-		
-		mdt.set_vertex_color(i, colour)
-	
-	temp_mesh.clear_surfaces()
-	mdt.commit_to_surface(temp_mesh)
-	ground_mesh.mesh = temp_mesh
-	
-	# Use vertex colours — set material to use them
-	var mat = StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.9
-	ground_mesh.set_surface_override_material(0, mat)
-	# NOTE: do not call update_ground_collision() here — deform_terrain() calls
-	# it once after apply_terrain_colours() returns, avoiding a double rebuild.
+		vert_colors[i] = colour
+
+	# Rebuild via SurfaceTool so generate_normals() recalculates correct normals
+	# after any terrain deformation (MeshDataTool keeps the original flat normals).
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	if indices.size() > 0:
+		for k in range(0, indices.size(), 3):
+			for j in range(3):
+				var vi := indices[k + j]
+				st.set_color(vert_colors[vi])
+				st.add_vertex(vertices[vi])
+	else:
+		for vi in range(vertices.size()):
+			st.set_color(vert_colors[vi])
+			st.add_vertex(vertices[vi])
+	st.generate_normals()
+	st.generate_tangents()
+	ground_mesh.mesh = st.commit()
+
+	# Create ShaderMaterial once, reuse every subsequent call
+	if _terrain_mat == null:
+		_terrain_mat = ShaderMaterial.new()
+		_terrain_mat.shader = load("res://shaders/terrain.gdshader")
+	ground_mesh.set_surface_override_material(0, _terrain_mat)
+	# NOTE: update_ground_collision() is called by deform_terrain() after this returns.
 
 func update_ground_collision():
 	# Update the shape in-place — no queue_free/await so there's never a
@@ -214,3 +238,32 @@ func update_ground_collision():
 		static_body.add_child(collision_shape)
 
 	collision_shape.shape = ground_mesh.mesh.create_trimesh_shape()
+
+func snap_all_statics():
+	var space_state = get_world_3d().direct_space_state
+	for group in ["shelters", "food", "debris", "trees"]:
+		for node in get_tree().get_nodes_in_group(group):
+			_snap_node_to_ground(node, space_state)
+	var maren = get_parent().get_node_or_null("Maren")
+	if maren:
+		_snap_node_to_ground(maren, space_state)
+
+func _snap_node_to_ground(node: Node3D, space_state):
+	var from = node.global_position + Vector3(0, 10.0, 0)
+	var to = node.global_position + Vector3(0, -5.0, 0)
+	var query = PhysicsRayQueryParameters3D.create(from, to)
+	# Exclude ALL collision objects in this node's subtree so the ray can't
+	# hit the object's own colliders and falsely report a raised terrain hit.
+	query.exclude = _get_collision_rids(node)
+	var result = space_state.intersect_ray(query)
+	if result:
+		var y_offset: float = node.get_meta("snap_y_offset", 0.0)
+		node.global_position.y = result.position.y + y_offset
+
+func _get_collision_rids(node: Node) -> Array:
+	var rids: Array = []
+	if node is CollisionObject3D:
+		rids.append(node.get_rid())
+	for child in node.get_children():
+		rids.append_array(_get_collision_rids(child))
+	return rids
