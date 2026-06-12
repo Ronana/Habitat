@@ -22,6 +22,23 @@ var tracked_roamer = null
 var current_trader = null
 var _attraction_hint_timer: float = 0.0
 
+# Toast notifications
+var _toast_stack: Array = []
+const TOAST_WIDTH  := 280.0
+const TOAST_HEIGHT := 56.0
+const TOAST_PAD    := 8.0
+const TOAST_MARGIN := 16.0
+
+# Roamer hover card
+var _hover_card: PanelContainer = null
+var _hover_card_name: Label = null
+var _hover_card_stage: Label = null
+var _hover_card_bar: ProgressBar = null
+var _hover_card_need: Label = null
+var _hovered_roamer = null
+var _hover_hide_tween: Tween = null
+const HOVER_RADIUS_PX := 70.0
+
 # Quest board
 var _quest_panel: PanelContainer = null
 var _quest_rows: Array = []
@@ -58,42 +75,88 @@ func _ready():
 	MilestoneManager.milestone_achieved.connect(_on_milestone_achieved)
 	ObjectiveManager.objectives_updated.connect(_refresh_quest_panel)
 	ObjectiveManager.objective_completed.connect(_on_objective_completed)
+	PrestigeManager.score_changed.connect(_on_prestige_changed)
+	_update_prestige_label(PrestigeManager.current_score)
+	_build_hover_card()
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
-const C_BG        := Color(0.07, 0.11, 0.07, 0.90)
+const C_BG         := Color(0.04, 0.07, 0.04, 0.96)
+const C_BG_LIGHT   := Color(0.07, 0.12, 0.06, 0.96)
 const C_BORDER     := Color(0.28, 0.46, 0.22, 1.00)
+const C_BORDER_DIM := Color(0.15, 0.26, 0.12, 1.00)
 const C_TEXT       := Color(0.93, 0.91, 0.82, 1.00)
-const C_MUTED      := Color(0.62, 0.72, 0.52, 1.00)
-const C_ACCENT     := Color(0.52, 0.82, 0.32, 1.00)
-const C_BTN_NORM   := Color(0.14, 0.24, 0.11, 1.00)
-const C_BTN_HOVER  := Color(0.22, 0.38, 0.17, 1.00)
-const C_BTN_PRESS  := Color(0.08, 0.15, 0.06, 1.00)
+const C_MUTED      := Color(0.58, 0.70, 0.48, 1.00)
+const C_ACCENT     := Color(0.52, 0.88, 0.32, 1.00)
+const C_GOLD       := Color(0.95, 0.80, 0.28, 1.00)
+const C_DEWDROP    := Color(0.55, 0.88, 1.00, 1.00)
+const C_BTN_NORM   := Color(0.10, 0.19, 0.08, 1.00)
+const C_BTN_HOVER  := Color(0.18, 0.34, 0.14, 1.00)
+const C_BTN_PRESS  := Color(0.06, 0.12, 0.05, 1.00)
+
+# Animated dewdrop display
+var _disp_dewdrops: float = 0.0
+var _tween_dewdrops: Tween = null
 
 func _make_panel_style(bg: Color = C_BG, border: Color = C_BORDER) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = bg
 	s.border_color = border
-	s.set_border_width_all(2)
-	s.set_corner_radius_all(8)
-	s.set_content_margin_all(10)
+	s.set_border_width_all(1)
+	s.set_corner_radius_all(10)
+	s.set_content_margin_all(12)
+	s.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	s.shadow_size = 6
+	s.shadow_offset = Vector2(2, 3)
 	return s
 
-func _make_btn_style(bg: Color) -> StyleBoxFlat:
+func _make_hud_style() -> StyleBoxFlat:
+	# Left accent bar — the hallmark of a premium game HUD
+	var s := StyleBoxFlat.new()
+	s.bg_color = C_BG
+	s.border_color = C_ACCENT  # accent colour on all sides; left is 3px so it dominates
+	s.set_border_width_all(1)
+	s.border_width_left = 3
+	s.set_corner_radius_all(10)
+	s.content_margin_left   = 14
+	s.content_margin_right  = 12
+	s.content_margin_top    = 12
+	s.content_margin_bottom = 12
+	s.shadow_color = Color(0.0, 0.0, 0.0, 0.6)
+	s.shadow_size = 8
+	s.shadow_offset = Vector2(3, 4)
+	return s
+
+func _make_btn_style(bg: Color, border: Color = C_BORDER_DIM) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = bg
-	s.border_color = C_BORDER
+	s.border_color = border
 	s.set_border_width_all(1)
-	s.set_corner_radius_all(5)
-	s.set_content_margin_all(6)
+	s.set_corner_radius_all(6)
+	s.content_margin_left   = 10
+	s.content_margin_right  = 10
+	s.content_margin_top    = 7
+	s.content_margin_bottom = 7
 	return s
 
-func _style_button(btn: Button):
-	btn.add_theme_stylebox_override("normal",   _make_btn_style(C_BTN_NORM))
-	btn.add_theme_stylebox_override("hover",    _make_btn_style(C_BTN_HOVER))
-	btn.add_theme_stylebox_override("pressed",  _make_btn_style(C_BTN_PRESS))
-	btn.add_theme_color_override("font_color",  C_TEXT)
-	btn.add_theme_color_override("font_hover_color",   C_ACCENT)
-	btn.add_theme_color_override("font_pressed_color", C_TEXT)
+func _make_accent_btn_style(bg: Color) -> StyleBoxFlat:
+	var s := _make_btn_style(bg, C_BORDER)
+	s.set_corner_radius_all(6)
+	return s
+
+func _style_button(btn: Button, accent: bool = false):
+	if accent:
+		btn.add_theme_stylebox_override("normal",   _make_accent_btn_style(C_BTN_NORM))
+		btn.add_theme_stylebox_override("hover",    _make_accent_btn_style(C_BTN_HOVER))
+		btn.add_theme_stylebox_override("pressed",  _make_accent_btn_style(C_BTN_PRESS))
+	else:
+		btn.add_theme_stylebox_override("normal",   _make_btn_style(C_BTN_NORM))
+		btn.add_theme_stylebox_override("hover",    _make_btn_style(C_BTN_HOVER))
+		btn.add_theme_stylebox_override("pressed",  _make_btn_style(C_BTN_PRESS))
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.add_theme_color_override("font_color",          C_TEXT)
+	btn.add_theme_color_override("font_hover_color",    C_ACCENT)
+	btn.add_theme_color_override("font_pressed_color",  C_TEXT)
+	btn.custom_minimum_size = Vector2(0, 32)
 
 func _style_bar(bar: ProgressBar, fill: Color):
 	var fill_style := StyleBoxFlat.new()
@@ -110,28 +173,274 @@ func _style_label(lbl: Label, size: int = 13, color: Color = C_TEXT):
 	lbl.add_theme_font_size_override("font_size", size)
 	lbl.add_theme_color_override("font_color", color)
 
+func _build_hover_card() -> void:
+	_hover_card = PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color      = Color(0.03, 0.06, 0.03, 0.94)
+	style.border_color  = C_ACCENT
+	style.set_border_width_all(1)
+	style.border_width_left = 3
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(10)
+	style.shadow_color  = Color(0, 0, 0, 0.6)
+	style.shadow_size   = 8
+	style.shadow_offset = Vector2(2, 3)
+	_hover_card.add_theme_stylebox_override("panel", style)
+	_hover_card.custom_minimum_size = Vector2(160, 0)
+	_hover_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hover_card.visible = false
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	_hover_card.add_child(vbox)
+
+	_hover_card_name = Label.new()
+	_hover_card_name.add_theme_font_size_override("font_size", 14)
+	_hover_card_name.add_theme_color_override("font_color", C_ACCENT)
+	vbox.add_child(_hover_card_name)
+
+	_hover_card_stage = Label.new()
+	_hover_card_stage.add_theme_font_size_override("font_size", 11)
+	_hover_card_stage.add_theme_color_override("font_color", C_MUTED)
+	vbox.add_child(_hover_card_stage)
+
+	_hover_card_bar = ProgressBar.new()
+	_hover_card_bar.custom_minimum_size = Vector2(140, 8)
+	_hover_card_bar.max_value = 1.0
+	_hover_card_bar.show_percentage = false
+	_style_bar(_hover_card_bar, C_ACCENT)
+	vbox.add_child(_hover_card_bar)
+
+	_hover_card_need = Label.new()
+	_hover_card_need.add_theme_font_size_override("font_size", 11)
+	_hover_card_need.add_theme_color_override("font_color", Color(1.0, 0.7, 0.2, 1.0))
+	vbox.add_child(_hover_card_need)
+
+	add_child(_hover_card)
+
+func _update_hover_card(delta: float) -> void:
+	var camera := get_viewport().get_camera_3d()
+	if not camera:
+		return
+	var mouse_pos := get_viewport().get_mouse_position()
+	var roamers   := get_tree().get_nodes_in_group("roamers")
+
+	var closest_roamer = null
+	var closest_dist   := HOVER_RADIUS_PX
+
+	for r in roamers:
+		if not is_instance_valid(r):
+			continue
+		if r == tracked_roamer:
+			continue  # already showing full info panel
+		var screen_pos := camera.unproject_position(r.global_position + Vector3(0, 0.8, 0))
+		var dist       := mouse_pos.distance_to(screen_pos)
+		if dist < closest_dist:
+			closest_dist   = dist
+			closest_roamer = r
+
+	if closest_roamer != _hovered_roamer:
+		_hovered_roamer = closest_roamer
+		if closest_roamer:
+			_populate_hover_card(closest_roamer)
+			_hover_card.visible = true
+			_hover_card.modulate = Color(1, 1, 1, 1)
+		else:
+			if _hover_card.visible:
+				var tw := create_tween()
+				tw.tween_property(_hover_card, "modulate", Color(1, 1, 1, 0), 0.12)
+				tw.tween_callback(func(): _hover_card.visible = false)
+
+	if _hovered_roamer and _hover_card.visible:
+		# Follow mouse with a small offset so the card doesn't overlap the cursor
+		var card_pos := mouse_pos + Vector2(18, -10)
+		var vp_size  := get_viewport().get_visible_rect().size
+		card_pos.x = clamp(card_pos.x, 0, vp_size.x - _hover_card.size.x - 4)
+		card_pos.y = clamp(card_pos.y, 0, vp_size.y - _hover_card.size.y - 4)
+		_hover_card.position = card_pos
+		# Refresh happiness bar live
+		_hover_card_bar.value = _hovered_roamer.happiness
+		_hover_card_bar.add_theme_stylebox_override("fill", _make_happiness_fill(_hovered_roamer.happiness))
+
+func _populate_hover_card(roamer) -> void:
+	var display_name: String = roamer.roamer_name if roamer.roamer_name != "" else roamer.name
+	_hover_card_name.text  = display_name
+	var stage_icons := ["👀 Appears", "🚶 Visits", "🏠 Resident", "💚 Bonded"]
+	_hover_card_stage.text = stage_icons[roamer.attraction_stage]
+	_hover_card_bar.value  = roamer.happiness
+	_hover_card_bar.add_theme_stylebox_override("fill", _make_happiness_fill(roamer.happiness))
+	# Worst need
+	var worst_need := ""
+	var worst_val  := 0.35
+	for need_name in roamer.needs:
+		if roamer.needs[need_name] < worst_val:
+			worst_val = roamer.needs[need_name]
+			match need_name:
+				"food":   worst_need = "🍃 Hungry"
+				"safety": worst_need = "⚠ Unsafe"
+				"space":  worst_need = "↔ Crowded"
+	_hover_card_need.text    = worst_need
+	_hover_card_need.visible = worst_need != ""
+
+func _make_happiness_fill(h: float) -> StyleBoxFlat:
+	var col: Color
+	if h > 0.7:
+		col = C_ACCENT.lerp(Color(0.3, 0.9, 0.3), (h - 0.7) / 0.3)
+	elif h > 0.4:
+		col = Color(0.9, 0.75, 0.2)
+	else:
+		col = Color(0.9, 0.3, 0.2)
+	var s := StyleBoxFlat.new()
+	s.bg_color = col
+	s.set_corner_radius_all(3)
+	return s
+
+# ── Toast notification system ─────────────────────────────────────────────────
+func show_toast(icon: String, title: String, subtitle: String = "", duration: float = 3.2) -> void:
+	var toast := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color     = Color(0.04, 0.08, 0.04, 0.96)
+	style.border_color = C_ACCENT
+	style.set_border_width_all(1)
+	style.border_width_left = 3
+	style.set_corner_radius_all(8)
+	style.set_content_margin_all(10)
+	style.shadow_color  = Color(0, 0, 0, 0.55)
+	style.shadow_size   = 6
+	style.shadow_offset = Vector2(2, 3)
+	toast.add_theme_stylebox_override("panel", style)
+	toast.custom_minimum_size = Vector2(TOAST_WIDTH, TOAST_HEIGHT)
+	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 10)
+	toast.add_child(hbox)
+
+	# Icon badge
+	var icon_lbl := Label.new()
+	icon_lbl.text = icon
+	icon_lbl.add_theme_font_size_override("font_size", 22)
+	icon_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hbox.add_child(icon_lbl)
+
+	var text_vbox := VBoxContainer.new()
+	text_vbox.add_theme_constant_override("separation", 2)
+	text_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(text_vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = title
+	title_lbl.add_theme_font_size_override("font_size", 13)
+	title_lbl.add_theme_color_override("font_color", C_TEXT)
+	text_vbox.add_child(title_lbl)
+
+	if subtitle != "":
+		var sub_lbl := Label.new()
+		sub_lbl.text = subtitle
+		sub_lbl.add_theme_font_size_override("font_size", 11)
+		sub_lbl.add_theme_color_override("font_color", C_MUTED)
+		sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		sub_lbl.custom_minimum_size = Vector2(TOAST_WIDTH - 60, 0)
+		text_vbox.add_child(sub_lbl)
+
+	add_child(toast)
+
+	# Position: top-right, stacked below existing toasts
+	var vp_size := get_viewport().get_visible_rect().size
+	var stack_y := TOAST_MARGIN + _toast_stack.size() * (TOAST_HEIGHT + TOAST_PAD)
+	var final_x := vp_size.x - TOAST_WIDTH - TOAST_MARGIN
+	toast.position = Vector2(vp_size.x + 10, stack_y)  # start off-screen right
+
+	_toast_stack.append(toast)
+
+	# Slide in
+	var tw_in := create_tween()
+	tw_in.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	tw_in.tween_property(toast, "position:x", final_x, 0.25)
+
+	# Hold, then fade out and remove
+	var tw_out := create_tween()
+	tw_out.tween_interval(duration)
+	tw_out.tween_property(toast, "modulate", Color(1, 1, 1, 0), 0.30)
+	tw_out.tween_callback(func():
+		_toast_stack.erase(toast)
+		toast.queue_free()
+		_restack_toasts()
+	)
+
+func _restack_toasts() -> void:
+	var vp_size := get_viewport().get_visible_rect().size
+	for i in _toast_stack.size():
+		var t: Control = _toast_stack[i]
+		if not is_instance_valid(t):
+			continue
+		var target_y := TOAST_MARGIN + i * (TOAST_HEIGHT + TOAST_PAD)
+		var tw := create_tween()
+		tw.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		tw.tween_property(t, "position:y", target_y, 0.18)
+
+func _make_sep() -> HSeparator:
+	var sep := HSeparator.new()
+	var sep_style := StyleBoxFlat.new()
+	sep_style.bg_color = Color(0.28, 0.46, 0.22, 0.40)
+	sep_style.content_margin_top    = 2
+	sep_style.content_margin_bottom = 2
+	sep.add_theme_stylebox_override("separator", sep_style)
+	sep.custom_minimum_size = Vector2(0, 1)
+	return sep
+
+func _inject_hud_separators():
+	# Insert visual section breaks into the main HUD VBox after key nodes.
+	# Runs once at startup — skips if already inserted.
+	var vbox := $Panel/VBoxContainer
+	var sep_after := ["FoodBar", "WeatherLabel", "PrestigeLabel", "QuestsButton"]
+	var inserted := 0
+	var i := 0
+	while i < vbox.get_child_count():
+		var child := vbox.get_child(i)
+		if child.name in sep_after:
+			# Check the next sibling isn't already a separator
+			var next := vbox.get_child(i + 1) if i + 1 < vbox.get_child_count() else null
+			if next == null or not (next is HSeparator):
+				var sep := _make_sep()
+				vbox.add_child(sep)
+				vbox.move_child(sep, i + 1)
+				inserted += 1
+				i += 2
+				continue
+		i += 1
+
 func _apply_theme():
-	# Panels
-	var panel_style = _make_panel_style()
+	# ── Main HUD panel — premium left-accent style ─────────────────────────────
+	$Panel.add_theme_stylebox_override("panel", _make_hud_style())
+	$Panel.custom_minimum_size = Vector2(240, 0)
+
+	# All other panels — rich dark with shadow
+	var panel_style := _make_panel_style()
 	for panel in get_tree().get_nodes_in_group("ui_panels"):
 		panel.add_theme_stylebox_override("panel", panel_style)
 
 	# VBox separation
-	for vbox in [$Panel/VBoxContainer, $ShopPanel/VBoxContainer,
-				 $InventoryPanel/VBoxContainer, $WardenPanel/VBoxContainer]:
+	$Panel/VBoxContainer.add_theme_constant_override("separation", 4)
+	for vbox in [$ShopPanel/VBoxContainer, $InventoryPanel/VBoxContainer,
+				 $WardenPanel/VBoxContainer]:
 		vbox.add_theme_constant_override("separation", 5)
 
-	# ── Main panel labels ──────────────────────────────────────────────────────
-	_style_label($Panel/VBoxContainer/RoamerName, 15, C_ACCENT)
-	_style_label($Panel/VBoxContainer/StageLabel, 12, C_MUTED)
-	_style_label($Panel/VBoxContainer/FoodLabel,  11, C_MUTED)
-	_style_label($Panel/VBoxContainer/CurrencyLabel, 13, Color(0.55, 0.85, 1.0, 1.0))
-	_style_label($Panel/VBoxContainer/ToolLabel,  11, C_MUTED)
-	_style_label($Panel/VBoxContainer/ClockLabel, 12, C_TEXT)
+	# ── Main HUD labels — three visual tiers ──────────────────────────────────
+	# Tier 1 — prominent (roamer name, dewdrops)
+	_style_label($Panel/VBoxContainer/RoamerName,    16, C_ACCENT)
+	_style_label($Panel/VBoxContainer/CurrencyLabel, 18, C_DEWDROP)
+	# Tier 2 — secondary info
+	_style_label($Panel/VBoxContainer/StageLabel,   12, C_MUTED)
+	_style_label($Panel/VBoxContainer/FoodLabel,    11, C_MUTED)
+	_style_label($Panel/VBoxContainer/ClockLabel,   13, C_TEXT)
 	_style_label($Panel/VBoxContainer/WeatherLabel, 12, C_TEXT)
 	_style_label($Panel/VBoxContainer/SeasonLabel,  12, Color(0.95, 0.80, 0.50, 1.0))
-	_style_label($Panel/VBoxContainer/PlacementLabel, 11, C_ACCENT)
-	_style_label($Panel/VBoxContainer/AttractionTitle, 12, Color(0.85, 0.95, 0.65, 1.0))
+	# Tier 3 — subtle / supporting
+	_style_label($Panel/VBoxContainer/ToolLabel,       11, C_MUTED)
+	_style_label($Panel/VBoxContainer/PrestigeLabel,   12, C_GOLD)
+	_style_label($Panel/VBoxContainer/PlacementLabel,  11, C_ACCENT)
+	_style_label($Panel/VBoxContainer/AttractionTitle, 11, Color(0.75, 0.92, 0.55, 1.0))
 	$Panel/VBoxContainer/AttractionTitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	$Panel/VBoxContainer/AttractionTitle.custom_minimum_size = Vector2(220, 0)
 	_style_label($Panel/VBoxContainer/AttractionHints, 10, C_MUTED)
@@ -139,14 +448,17 @@ func _apply_theme():
 	# Food bar — amber
 	_style_bar(food_bar, Color(0.90, 0.65, 0.20, 1.0))
 
-	# Main panel buttons
-	_style_button($Panel/VBoxContainer/JournalButton)
-	_style_button($Panel/VBoxContainer/QuestsButton)
+	# Buttons — accent style for Journal/Quests
+	_style_button($Panel/VBoxContainer/JournalButton, true)
+	_style_button($Panel/VBoxContainer/QuestsButton,  true)
+
+	# Inject section separators
+	_inject_hud_separators()
 
 	# ── Shop panel ─────────────────────────────────────────────────────────────
-	_style_label($ShopPanel/VBoxContainer/ShopTitle, 16, C_ACCENT)
-	_style_label($ShopPanel/VBoxContainer/DewdropsLabel, 13, Color(0.55, 0.85, 1.0, 1.0))
-	_style_label($ShopPanel/VBoxContainer/FeedbackLabel, 12, C_TEXT)
+	_style_label($ShopPanel/VBoxContainer/ShopTitle,    17, C_ACCENT)
+	_style_label($ShopPanel/VBoxContainer/DewdropsLabel,13, C_DEWDROP)
+	_style_label($ShopPanel/VBoxContainer/FeedbackLabel,12, C_TEXT)
 	_style_button($ShopPanel/VBoxContainer/CloseButton)
 
 	# ── Inventory panel ────────────────────────────────────────────────────────
@@ -156,9 +468,8 @@ func _apply_theme():
 	_style_label(warden_title, 14, C_ACCENT)
 	_style_label(level_label,  13, C_TEXT)
 	_style_label(xp_label,     11, C_MUTED)
-	# XP bar — bright green
-	_style_bar(xp_bar, Color(0.45, 0.80, 0.28, 1.0))
-	
+	_style_bar(xp_bar, Color(0.45, 0.85, 0.28, 1.0))
+
 	
 
 # ── Selected roamer info panel ────────────────────────────────────────────────
@@ -272,51 +583,16 @@ func _update_info_panel():
 
 # ── Milestone popup ───────────────────────────────────────────────────────────
 func _on_milestone_achieved(title: String, subtitle: String):
-	var popup := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.06, 0.10, 0.06, 0.96)
-	style.border_color = Color(0.95, 0.80, 0.30)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(18)
-	popup.add_theme_stylebox_override("panel", style)
-	popup.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	popup.offset_top = 80.0
-	popup.offset_bottom = 80.0
+	# Use a toast for quick feedback — the icon is extracted from the title if present
+	show_toast("🏆", title, subtitle, 4.0)
 
-	var vbox := VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 6)
-	popup.add_child(vbox)
-
-	var title_lbl := Label.new()
-	title_lbl.text = title
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.add_theme_font_size_override("font_size", 20)
-	title_lbl.add_theme_color_override("font_color", Color(0.95, 0.80, 0.30))
-	vbox.add_child(title_lbl)
-
-	var sub_lbl := Label.new()
-	sub_lbl.text = subtitle
-	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	sub_lbl.custom_minimum_size = Vector2(280, 0)
-	sub_lbl.add_theme_font_size_override("font_size", 12)
-	sub_lbl.add_theme_color_override("font_color", C_TEXT)
-	vbox.add_child(sub_lbl)
-
-	add_child(popup)
-	popup.modulate = Color(1, 1, 1, 0)
-	var tween := create_tween()
-	tween.tween_property(popup, "modulate", Color(1, 1, 1, 1), 0.4)
-	tween.tween_interval(3.0)
-	tween.tween_property(popup, "modulate", Color(1, 1, 1, 0), 0.6)
-	tween.tween_callback(popup.queue_free)
-
-func _process(delta):
+func _process(delta: float) -> void:
 	if tracked_roamer:
 		update_ui()
 	$Panel/VBoxContainer/ClockLabel.text = "🕐 " + DayNightManager.get_time_string()
+
+	# Hover card — detect nearest roamer to mouse
+	_update_hover_card(delta)
 
 	# Update attraction hints every 3 seconds to avoid per-frame work
 	_attraction_hint_timer += delta
@@ -337,8 +613,8 @@ func _update_attraction_hints():
 func show_roamer(roamer):
 	tracked_roamer = roamer
 	roamer_name.text = roamer.name
-	if _info_panel:
-		_info_panel.visible = true
+	if _info_panel and not _info_panel.visible:
+		_show_panel(_info_panel, 16.0)
 	_update_info_panel()
 
 func hide_roamer():
@@ -346,8 +622,8 @@ func hide_roamer():
 	roamer_name.text = "No Roamer Selected"
 	stage_label.text = "Stage: —"
 	food_bar.value = 0.0
-	if _info_panel:
-		_info_panel.visible = false
+	if _info_panel and _info_panel.visible:
+		_hide_panel(_info_panel, 16.0)
 
 func update_ui():
 	var stage_names = ["Appears", "Visits", "Resident", "Bonded"]
@@ -355,15 +631,57 @@ func update_ui():
 	food_bar.value = tracked_roamer.needs["food"]
 	_update_info_panel()
 
-func _on_dewdrops_changed(_amount):
-	update_currency()
+func _on_dewdrops_changed(_amount) -> void:
+	_animate_dewdrops(CurrencyManager.dewdrops)
 
-func update_currency():
-	currency_label.text = "Dewdrops: " + str(snappedf(CurrencyManager.dewdrops, 0.1))
+func _animate_dewdrops(target: float) -> void:
+	if _tween_dewdrops:
+		_tween_dewdrops.kill()
+	_tween_dewdrops = create_tween()
+	_tween_dewdrops.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	_tween_dewdrops.tween_method(_set_dewdrop_display, _disp_dewdrops, target, 0.55)
+
+func _set_dewdrop_display(val: float) -> void:
+	_disp_dewdrops = val
+	currency_label.text = "💧 " + str(int(val))
+
+func update_currency() -> void:
+	_disp_dewdrops = CurrencyManager.dewdrops
+	currency_label.text = "💧 " + str(int(_disp_dewdrops))
+
+# ── Panel animation helpers ───────────────────────────────────────────────────
+func _show_panel(panel: Control, slide_from_x: float = 0.0) -> void:
+	panel.modulate = Color(1, 1, 1, 0)
+	panel.visible  = true
+	if slide_from_x != 0.0:
+		panel.offset_left  += slide_from_x
+		panel.offset_right += slide_from_x
+	var tw := create_tween().set_parallel(true)
+	tw.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, "modulate", Color(1, 1, 1, 1), 0.22)
+	if slide_from_x != 0.0:
+		var tgt_left  := panel.offset_left  - slide_from_x
+		var tgt_right := panel.offset_right - slide_from_x
+		tw.tween_property(panel, "offset_left",  tgt_left,  0.22)
+		tw.tween_property(panel, "offset_right", tgt_right, 0.22)
+
+func _hide_panel(panel: Control, slide_to_x: float = 0.0) -> void:
+	var tw := create_tween().set_parallel(true)
+	tw.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+	tw.tween_property(panel, "modulate", Color(1, 1, 1, 0), 0.16)
+	if slide_to_x != 0.0:
+		tw.tween_property(panel, "offset_left",  panel.offset_left  + slide_to_x, 0.16)
+		tw.tween_property(panel, "offset_right", panel.offset_right + slide_to_x, 0.16)
+	tw.chain().tween_callback(func():
+		panel.visible = false
+		if slide_to_x != 0.0:
+			panel.offset_left  -= slide_to_x
+			panel.offset_right -= slide_to_x
+	)
 
 func open_shop(trader):
 	current_trader = trader
-	shop_panel.visible = true
+	_show_panel(shop_panel, 20.0)
 	shop_feedback.text = ""
 	_rebuild_shop_buttons()
 	_update_shop_dewdrops()
@@ -412,7 +730,7 @@ func _update_shop_dewdrops():
 func close_shop():
 	if current_trader and current_trader.has_method("hide_selection_ring"):
 		current_trader.hide_selection_ring()
-	shop_panel.visible = false
+	_hide_panel(shop_panel, 20.0)
 	current_trader = null
 
 func _on_buy_item(index: int):
@@ -479,24 +797,31 @@ func use_roamer_treat_named(item_name: String):
 		placement_label.text = "🍓 Fed " + item_name + " to " + tracked_roamer.name
 		placement_label.modulate = Color(0.4, 0.9, 0.4)
 		
-func _on_weather_changed(new_weather):
+func _on_weather_changed(_new_weather) -> void:
 	update_weather_ui()
+	var weather_icons := {0: "☀️", 1: "🌧️", 2: "🌫️", 3: "💨"}
+	var weather_names := {0: "Sunny", 1: "Raining", 2: "Foggy", 3: "Windy"}
+	var w: int = WeatherManager.current_weather
+	show_toast(weather_icons.get(w, "🌤"), weather_names.get(w, ""), "", 2.5)
 
 func update_weather_ui():
-	var icons = {
+	var labels = {
 		0: "☀️ Sunny",
-		1: "🌧️ Raining",
-		2: "🌫️ Foggy",
-		3: "💨 Windy"
+		1: "🌧️ Rain — roamers seek shelter",
+		2: "🌫️ Foggy — roamers uneasy",
+		3: "💨 Windy — roamers restless"
 	}
-	$Panel/VBoxContainer/WeatherLabel.text = icons[WeatherManager.current_weather]
+	$Panel/VBoxContainer/WeatherLabel.text = labels[WeatherManager.current_weather]
 
 func _on_xp_gained(_amount, _total):
 	update_warden_ui()
 
-func _on_level_up(_new_level):
+func _on_level_up(_new_level: int) -> void:
 	update_warden_ui()
 	show_level_up_message()
+	# Refresh shop so newly unlocked items appear immediately
+	if shop_panel.visible:
+		_rebuild_shop_buttons()
 
 func update_warden_ui():
 	warden_title.text = "🌿 " + WardenManager.get_title()
@@ -558,13 +883,25 @@ func show_level_up_message():
 	tween.tween_property(popup, "modulate", Color(1, 1, 1, 0), 0.6)
 	tween.tween_callback(popup.queue_free)
 
+func _on_prestige_changed(new_score: int) -> void:
+	_update_prestige_label(new_score)
+
+func _update_prestige_label(score: int) -> void:
+	var lbl := $Panel/VBoxContainer/PrestigeLabel
+	if lbl:
+		lbl.text = "⭐ " + PrestigeManager.get_rank() + "  (" + str(score) + ")"
+
 func _on_journal_button():
 	var journal = get_tree().get_root().get_node("Garden/FieldJournal")
 	journal.toggle_journal()
 
 func _on_quests_button():
-	if _quest_panel:
-		_quest_panel.visible = not _quest_panel.visible
+	if not _quest_panel:
+		return
+	if _quest_panel.visible:
+		_hide_panel(_quest_panel, -18.0)
+	else:
+		_show_panel(_quest_panel, -18.0)
 
 # ── Quest board ────────────────────────────────────────────────────────────────
 
@@ -633,12 +970,13 @@ func _refresh_quest_panel():
 			row["box"].visible = false
 
 func _on_objective_completed(obj: Dictionary):
-	var reward_text := "+ " + str(obj.get("reward", 0)) + " 💧  Quest complete!"
-	_on_milestone_achieved("✓ Quest Complete!", obj.get("desc", "") + "\n" + reward_text)
+	var reward := str(obj.get("reward", 0))
+	show_toast("✅", "Quest Complete!", obj.get("desc", "") + "  +" + reward + " 💧")
 	_refresh_quest_panel()
 
 func _on_season_changed(_season):
 	update_season_ui()
+	show_toast("🌿", "Season changed", SeasonManager.get_season_string())
 
 func _on_day_passed(_day):
 	update_season_ui()

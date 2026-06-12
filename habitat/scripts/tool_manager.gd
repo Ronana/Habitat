@@ -164,7 +164,7 @@ func place_item():
 					var shelter = shelter_scene.instantiate()
 					get_parent().add_child(shelter)
 					shelter.global_position = result.position
-					WardenManager.gain_xp("bush_planted")
+					WardenManager.gain_xp("shelter_placed")
 					placed = true
 			"Wildgrass Seeds":
 				if InventoryManager.remove_item("Wildgrass Seeds"):
@@ -180,7 +180,7 @@ func place_item():
 					var burrow = cosy_burrow_scene.instantiate()
 					get_parent().add_child(burrow)
 					burrow.global_position = result.position
-					WardenManager.gain_xp("bush_planted")
+					WardenManager.gain_xp("shelter_placed")
 					placed = true
 			# ── Decoratives ───────────────────────────────────────────────────
 			"Flower Patch":
@@ -282,7 +282,7 @@ func deform_terrain(hit_pos: Vector3):
 		return
 	WardenManager.gain_xp("terrain_shaped")
 	var direction = 1.0 if raise_terrain else -1.0
-	var vertices_affected = 0
+	var _vertices_affected := 0
 
 	for i in range(mesh_data_tool.get_vertex_count()):
 		var vertex = mesh_data_tool.get_vertex(i)
@@ -302,7 +302,7 @@ func deform_terrain(hit_pos: Vector3):
 			
 			vertex.y = new_y
 			mesh_data_tool.set_vertex(i, vertex)
-			vertices_affected += 1
+			_vertices_affected += 1
 
 	array_mesh.clear_surfaces()
 	mesh_data_tool.commit_to_surface(array_mesh)

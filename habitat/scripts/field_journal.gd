@@ -167,12 +167,33 @@ func _input(event):
 			toggle_journal()
 
 func toggle_journal():
-	journal_panel.visible = !journal_panel.visible
 	if journal_panel.visible:
+		_hide_panel(journal_panel)
+	else:
 		refresh_journal()
+		_show_panel(journal_panel)
 
 func close_journal():
-	journal_panel.visible = false
+	_hide_panel(journal_panel)
+
+func _show_panel(panel: Control) -> void:
+	panel.modulate = Color(1, 1, 1, 0)
+	panel.visible  = true
+	panel.scale    = Vector2(0.96, 0.96)
+	var tw := create_tween().set_parallel(true)
+	tw.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, "modulate", Color(1, 1, 1, 1), 0.22)
+	tw.tween_property(panel, "scale",    Vector2(1.0, 1.0),  0.22)
+
+func _hide_panel(panel: Control) -> void:
+	var tw := create_tween().set_parallel(true)
+	tw.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+	tw.tween_property(panel, "modulate", Color(1, 1, 1, 0), 0.16)
+	tw.tween_property(panel, "scale",    Vector2(0.96, 0.96), 0.16)
+	tw.chain().tween_callback(func():
+		panel.visible = false
+		panel.scale   = Vector2(1.0, 1.0)
+	)
 
 func discover_roamer(roamer_name: String):
 	if not journal_entries.has(roamer_name):
@@ -315,7 +336,8 @@ func _get_family_text(roamer) -> String:
 		for r in get_tree().get_nodes_in_group("roamers"):
 			if str(r.get_instance_id()) == roamer.parent_a_id or \
 			   str(r.get_instance_id()) == roamer.parent_b_id:
-				parent_names.append(r.name)
+				var pname: String = r.roamer_name if r.roamer_name != "" else r.name
+				parent_names.append(pname)
 		if parent_names.size() > 0:
 			lines.append("Parents: " + ", ".join(parent_names))
 		else:

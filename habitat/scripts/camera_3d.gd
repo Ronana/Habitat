@@ -17,7 +17,7 @@ var max_pitch: float = -10.0
 # Zoom
 var zoom_speed: float = 3.0
 var min_zoom: float = 5.0
-var max_zoom: float = 60.0
+var max_zoom: float = 30.0
 var target_zoom: float = 25.0
 var current_zoom: float = 25.0
 

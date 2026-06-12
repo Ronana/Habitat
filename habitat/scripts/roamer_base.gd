@@ -665,20 +665,38 @@ func seek_nearest_food():
 		print(name, " is seeking food!")
 
 func update_needs(delta):
+	# ── Weather modifiers ────────────────────────────────────────────────────
+	var food_weather   := 1.0
+	var safety_weather := 1.0
+	var space_weather  := 1.0
+	var weather := WeatherManager.current_weather
+	match weather:
+		WeatherManager.Weather.RAIN:
+			food_weather   = 0.80  # plants grow → food lasts longer
+			safety_weather = 1.15  # roamers feel exposed in rain
+		WeatherManager.Weather.FOG:
+			safety_weather = 1.08  # unsettled in the murk
+		WeatherManager.Weather.WIND:
+			space_weather  = 1.20  # restless — feel crowded faster
+			safety_weather = 1.10
+
 	# Food — straight decay
-	needs["food"] = max(0.0, needs["food"] - need_decay["food"] * delta)
+	needs["food"] = max(0.0, needs["food"] - need_decay["food"] * food_weather * delta)
 
 	# Safety — decays normally; shelter restores it passively
 	if has_shelter and is_instance_valid(shelter_node):
-		# Shelter present: restore safety faster than it decays
 		needs["safety"] = min(1.0, needs["safety"] + 0.008 * delta)
 	else:
-		needs["safety"] = max(0.0, needs["safety"] - need_decay["safety"] * delta)
+		needs["safety"] = max(0.0, needs["safety"] - need_decay["safety"] * safety_weather * delta)
+		# Rain / wind with no shelter: seek one urgently
+		if (weather == WeatherManager.Weather.RAIN or weather == WeatherManager.Weather.WIND) \
+				and state == State.WANDERING:
+			shelter_seek_timer = shelter_seek_interval  # trigger shelter seek next tick
 
 	# Space — decays faster the more roamers are in the garden
 	var roamer_count: int = get_tree().get_nodes_in_group("roamers").size()
 	var crowding_factor: float = clamp(float(roamer_count) / 6.0, 0.5, 3.0)
-	needs["space"] = max(0.0, needs["space"] - need_decay["space"] * crowding_factor * delta)
+	needs["space"] = max(0.0, needs["space"] - need_decay["space"] * crowding_factor * space_weather * delta)
 
 func update_happiness():
 	var total = 0.0

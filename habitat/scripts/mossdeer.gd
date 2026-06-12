@@ -51,9 +51,9 @@ func pick_wander_target():
 			wander_timer = randf_range(5.0, 10.0)
 			return
 	# Standard wide wander
-	var range := 25.0
+	var wander_range := 25.0
 	var t := global_position + Vector3(
-		randf_range(-range, range), 0.0, randf_range(-range, range))
+		randf_range(-wander_range, wander_range), 0.0, randf_range(-wander_range, wander_range))
 	wander_target = Vector3(
 		clamp(t.x, -half_area, half_area), t.y,
 		clamp(t.z, -half_area, half_area))

@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://egg_scene_habitat"]
+[gd_scene format=3 uid="uid://iknw24sfo2oq"]
 
-[ext_resource type="Script" path="res://scripts/egg.gd" id="1_eggscr"]
+[ext_resource type="Script" uid="uid://bd7gxq7d80up8" path="res://scripts/egg.gd" id="1_eggscr"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_egg"]
 albedo_color = Color(0.96, 0.92, 0.75, 1)
@@ -11,9 +11,9 @@ material = SubResource("StandardMaterial3D_egg")
 radius = 0.22
 height = 0.38
 
-[node name="Egg" type="Node3D"]
+[node name="Egg" type="Node3D" unique_id=720341721]
 script = ExtResource("1_eggscr")
 
-[node name="EggMesh" type="MeshInstance3D" parent="."]
+[node name="EggMesh" type="MeshInstance3D" parent="." unique_id=1777714367]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
 mesh = SubResource("SphereMesh_egg")

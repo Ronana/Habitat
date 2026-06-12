@@ -2,31 +2,90 @@
 
 [ext_resource type="Script" path="res://scripts/tree.gd" id="1_tree"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ict6q"]
-albedo_color = Color(0.2901961, 0.18431373, 0.101960786, 1)
+[sub_resource type="StandardMaterial3D" id="RootMat"]
+albedo_color = Color(0.15, 0.09, 0.05, 1)
+roughness = 0.98
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_avsvi"]
-material = SubResource("StandardMaterial3D_ict6q")
-top_radius = 0.2
-bottom_radius = 0.3
-height = 3.0
+[sub_resource type="CylinderMesh" id="RootMesh"]
+material = SubResource("RootMat")
+top_radius = 0.32
+bottom_radius = 0.58
+height = 0.55
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vplca"]
-albedo_color = Color(0.1764706, 0.3529412, 0.11764706, 1)
-roughness = 0.9
+[sub_resource type="StandardMaterial3D" id="TrunkMat"]
+albedo_color = Color(0.21, 0.13, 0.07, 1)
+roughness = 0.95
 
-[sub_resource type="SphereMesh" id="SphereMesh_viusy"]
-material = SubResource("StandardMaterial3D_vplca")
-radius = 2.5
-height = 4.0
+[sub_resource type="CylinderMesh" id="TrunkMesh"]
+material = SubResource("TrunkMat")
+top_radius = 0.17
+bottom_radius = 0.28
+height = 3.1
 
-[node name="Tree" type="Node3D" unique_id=1172282460]
+[sub_resource type="StandardMaterial3D" id="CanopyMat_A"]
+albedo_color = Color(0.14, 0.36, 0.09, 1)
+roughness = 0.85
+emission_enabled = true
+emission = Color(0, 0, 0, 1)
+emission_energy_multiplier = 0.0
+
+[sub_resource type="StandardMaterial3D" id="CanopyMat_B"]
+albedo_color = Color(0.11, 0.32, 0.07, 1)
+roughness = 0.87
+emission_enabled = true
+emission = Color(0, 0, 0, 1)
+emission_energy_multiplier = 0.0
+
+[sub_resource type="StandardMaterial3D" id="CanopyMat_C"]
+albedo_color = Color(0.17, 0.40, 0.11, 1)
+roughness = 0.83
+emission_enabled = true
+emission = Color(0, 0, 0, 1)
+emission_energy_multiplier = 0.0
+
+[sub_resource type="SphereMesh" id="CanopyMesh_A"]
+material = SubResource("CanopyMat_A")
+radius = 2.2
+height = 3.8
+
+[sub_resource type="SphereMesh" id="CanopyMesh_B"]
+material = SubResource("CanopyMat_B")
+radius = 1.35
+height = 2.4
+
+[sub_resource type="SphereMesh" id="CanopyMesh_C"]
+material = SubResource("CanopyMat_C")
+radius = 1.6
+height = 2.8
+
+[node name="Tree" type="Node3D"]
 script = ExtResource("1_tree")
 
-[node name="Trunk" type="MeshInstance3D" parent="." unique_id=626329561]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
-mesh = SubResource("CylinderMesh_avsvi")
+[node name="RootFlare" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.28, 0)
+mesh = SubResource("RootMesh")
 
-[node name="Canopy" type="MeshInstance3D" parent="." unique_id=34575961]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
-mesh = SubResource("SphereMesh_viusy")
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.93, 0)
+mesh = SubResource("TrunkMesh")
+
+[node name="CanopyRoot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.6, 0)
+
+[node name="Canopy" type="MeshInstance3D" parent="CanopyRoot"]
+mesh = SubResource("CanopyMesh_A")
+
+[node name="CanopyUpper" type="MeshInstance3D" parent="CanopyRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 1.55, 0.18)
+mesh = SubResource("CanopyMesh_B")
+
+[node name="CanopySide" type="MeshInstance3D" parent="CanopyRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, -0.42, 0.52)
+mesh = SubResource("CanopyMesh_C")
+
+[node name="MagicLight" type="OmniLight3D" parent="CanopyRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+light_color = Color(0.32, 1.0, 0.44, 1)
+light_energy = 0.0
+omni_range = 5.5
+shadow_enabled = false

@@ -29,6 +29,8 @@ ParticleManager="*res://scripts/particle_manager.gd"
 MilestoneManager="*res://scripts/milestone_manager.gd"
 SettingsManager="*res://scripts/settings_manager.gd"
 ObjectiveManager="*res://scripts/objective_manager.gd"
+PrestigeManager="*res://scripts/prestige_manager.gd"
+TutorialManager="*res://scripts/tutorial_manager.gd"
 
 [physics]
 

@@ -1,6 +1,6 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://blxiqj5whklmf"]
 
-[ext_resource type="Script" path="res://scripts/moss_torch.gd" id="1_mo"]
+[ext_resource type="Script" uid="uid://tu8sn8bkjhyb" path="res://scripts/moss_torch.gd" id="1_mo"]
 
-[node name="MossTorch" type="Node3D"]
+[node name="MossTorch" type="Node3D" unique_id=467617079]
 script = ExtResource("1_mo")

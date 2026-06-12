@@ -60,6 +60,10 @@ text = "📋 Quests"
 layout_mode = 2
 text = "🌸 Spring — Day 1"
 
+[node name="PrestigeLabel" type="Label" parent="Panel/VBoxContainer" unique_id=465804820]
+layout_mode = 2
+text = "⭐ Budding Garden  (0)"
+
 [node name="PlacementLabel" type="Label" parent="Panel/VBoxContainer" unique_id=465804814]
 layout_mode = 2
 text = ""

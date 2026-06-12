@@ -48,11 +48,10 @@ func _ready():
 		_fill_active()
 	CurrencyManager.dewdrops_changed.connect(_on_dewdrops_changed)
 
-func _on_dewdrops_changed(new_val: float):
-	# We can't track the delta directly; just poll periodically in _process
-	pass
+func _on_dewdrops_changed(_new_val: float) -> void:
+	pass  # Evaluated by polling in _process
 
-func _process(_delta):
+func _process(_delta: float) -> void:
 	_check_all()
 
 # ── Public ────────────────────────────────────────────────────────────────────

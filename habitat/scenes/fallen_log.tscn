@@ -1,6 +1,6 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://h6rlj5hveojn"]
 
-[ext_resource type="Script" path="res://scripts/fallen_log.gd" id="1_fl"]
+[ext_resource type="Script" uid="uid://du6nqnf4nwvaf" path="res://scripts/fallen_log.gd" id="1_fl"]
 
-[node name="FallenLog" type="Node3D"]
+[node name="FallenLog" type="Node3D" unique_id=1391401598]
 script = ExtResource("1_fl")

@@ -102,9 +102,9 @@ func pick_wander_target():
 			wander_timer = randf_range(3.0, 7.0)
 			return
 	# Standard wander — tighter radius than base (12 vs 20)
-	var range := 12.0
+	var wander_range := 12.0
 	var t := global_position + Vector3(
-		randf_range(-range, range), 0.0, randf_range(-range, range))
+		randf_range(-wander_range, wander_range), 0.0, randf_range(-wander_range, wander_range))
 	wander_target = Vector3(
 		clamp(t.x, -half_area, half_area), t.y,
 		clamp(t.z, -half_area, half_area))

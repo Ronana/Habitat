@@ -10,15 +10,20 @@ var xp_multiplier: float = 1.5
 
 # XP rewards for actions
 var xp_rewards = {
-	"roamer_appears": 10.0,
-	"roamer_visits": 25.0,
-	"roamer_resident": 50.0,
-	"roamer_bonded": 100.0,
-	"roamer_fed": 2.0,
-	"roamer_bred": 150.0,
-	"soured_restored": 200.0,
-	"bush_planted": 5.0,
-	"terrain_shaped": 1.0
+	"roamer_appears":    10.0,
+	"roamer_visits":     25.0,
+	"roamer_resident":   50.0,
+	"roamer_bonded":    100.0,
+	"roamer_fed":         2.0,
+	"roamer_bred":      150.0,
+	"egg_laid":         150.0,  # alias used by roamer_base
+	"egg_hatched":       30.0,
+	"objective_complete": 20.0,
+	"soured_restored":  200.0,
+	"bush_planted":       5.0,
+	"terrain_shaped":     1.0,
+	"shelter_placed":    15.0,
+	"decor_placed":       3.0,
 }
 
 # What unlocks at each level
