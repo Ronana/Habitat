@@ -28,13 +28,22 @@ func _on_season_changed(season: int):
 
 func _apply_season_colours(season: int):
 	var colours = SEASON_COLOURS.get(season, SEASON_COLOURS[0])
-	_set_mesh_colour($Bush, colours[0])
-	_set_mesh_colour($Berries, colours[1])
+	_tint_all_meshes($Bush, colours[0])     # gltf root — walk its children
+	_set_mesh_colour($Berries, colours[1])  # direct MeshInstance3D
+
+# Recursively tint all MeshInstance3D nodes inside a node hierarchy.
+# Needed because gltf assets import as Node3D with MeshInstance3D children.
+func _tint_all_meshes(node: Node, colour: Color) -> void:
+	if node is MeshInstance3D:
+		_set_mesh_colour(node as MeshInstance3D, colour)
+	for child in node.get_children():
+		_tint_all_meshes(child, colour)
 
 func _set_mesh_colour(node: MeshInstance3D, colour: Color):
 	var mat: StandardMaterial3D = node.get_surface_override_material(0)
 	if mat == null:
-		mat = node.mesh.surface_get_material(0).duplicate() as StandardMaterial3D
+		var base = node.mesh.surface_get_material(0) if node.mesh else null
+		mat = (base.duplicate() as StandardMaterial3D) if base is StandardMaterial3D else StandardMaterial3D.new()
 	else:
 		mat = mat.duplicate() as StandardMaterial3D
 	mat.albedo_color = colour

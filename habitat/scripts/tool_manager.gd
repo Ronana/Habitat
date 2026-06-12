@@ -2,6 +2,11 @@ extends Node3D
 
 enum Tool { NONE, SPADE }
 
+# ── Active tool from the wheel ─────────────────────────────────────────────────
+# "hand"   = normal roamer/item interaction (no terrain editing on plain click)
+# "shovel" = left-click digs, right-click raises terrain
+var active_tool: String = "hand"
+
 var current_tool = Tool.SPADE
 var spade_radius: float = 3.0
 var spade_strength: float = 2.0
@@ -93,13 +98,30 @@ func build_mesh_data_tool():
 	update_ground_collision()
 	
 
+## Called by the tool wheel when the player selects a tool.
+func set_active_tool(tool_id: String) -> void:
+	active_tool = tool_id
+
 func _input(event):
 	if not event is InputEventMouseButton:
 		return
 	if not event.pressed:
 		return
-	
-	# Left click — terrain tools only
+
+	# ── Shovel tool selected from wheel ───────────────────────────────────────
+	if active_tool == "shovel":
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			raise_terrain = false   # left-click = dig
+			use_spade()
+			get_viewport().set_input_as_handled()
+			return
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			raise_terrain = true    # right-click = raise
+			use_spade()
+			get_viewport().set_input_as_handled()
+			return
+
+	# ── Legacy keyboard modifiers (still work regardless of tool) ─────────────
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if Input.is_key_pressed(KEY_SHIFT):
 			raise_terrain = false
@@ -111,8 +133,8 @@ func _input(event):
 			use_spade()
 			get_viewport().set_input_as_handled()
 			return
-	
-	# Right click — place item if one is selected
+
+	# ── Right click — place item if one is selected ───────────────────────────
 	if event.button_index == MOUSE_BUTTON_RIGHT:
 		if placement_item != "":
 			place_item()

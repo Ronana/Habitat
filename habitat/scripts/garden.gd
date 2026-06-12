@@ -1,8 +1,8 @@
 extends Node3D
 
 @export var tree_scene: PackedScene
-@export var tree_count: int = 70
-@export var forest_radius: float = 170.0
+@export var tree_count: int = 500
+@export var forest_radius: float = 200.0
 @export var min_scale: float = 0.6
 @export var max_scale: float = 1.6
 @export var starter_area_size: float = 40.0
@@ -107,7 +107,31 @@ func _ready():
 	SeasonManager.sun = sun
 	_setup_sky(env)
 	
-	# Pause menu
+	# ── Tool wheel (radial menu — open with Q) ───────────────────────────────
+	var tool_wheel_script := load("res://scripts/tool_wheel.gd") as GDScript
+	if tool_wheel_script:
+		var wheel := CanvasLayer.new()
+		wheel.name = "ToolWheel"
+		wheel.set_script(tool_wheel_script)
+		add_child(wheel)
+
+		# ── Tool carrier (3D floating shovel beside cursor) ───────────────────
+		var carrier_script := load("res://scripts/tool_carrier.gd") as GDScript
+		if carrier_script:
+			var carrier := Node3D.new()
+			carrier.name = "ToolCarrier"
+			carrier.set_script(carrier_script)
+			add_child(carrier)
+
+			# When a tool is selected: update tool_manager + carrier
+			wheel.tool_selected.connect(func(tool_id: String) -> void:
+				var tm := get_node_or_null("ToolManager")
+				if tm:
+					tm.set_active_tool(tool_id)
+				carrier.set_tool(tool_id)
+			)
+
+	# ── Pause menu ───────────────────────────────────────────────────────────
 	var pause_scene := load("res://scenes/pause_menu.tscn") as PackedScene
 	if pause_scene:
 		var pause_menu := pause_scene.instantiate()
@@ -838,63 +862,76 @@ void fragment() {
 	return mat
 
 func scatter_debris():
-	var half = starter_area_size / 2.0
-	var debris_items = [
-		{"name": "Rock", "colour": Color(0.45, 0.35, 0.25), "scale": Vector3(0.8, 0.4, 0.6), "mesh": "box", "reward": 5.0, "xp": 8.0},
-		{"name": "Log", "colour": Color(0.35, 0.25, 0.15), "scale": Vector3(1.2, 0.3, 0.4), "mesh": "box", "reward": 8.0, "xp": 10.0},
-		{"name": "SmallRock", "colour": Color(0.3, 0.28, 0.2), "scale": Vector3(0.5, 0.5, 0.5), "mesh": "sphere", "reward": 3.0, "xp": 5.0},
-		{"name": "Stone", "colour": Color(0.4, 0.32, 0.22), "scale": Vector3(0.6, 0.35, 0.5), "mesh": "sphere", "reward": 4.0, "xp": 6.0},
-	]
-	
-	for j in range(15):
-		var item = debris_items[randi() % debris_items.size()]
-		
-		# Root node for the debris item
-		var debris_node = StaticBody3D.new()
-		debris_node.name = item["name"] + "_" + str(j)
-		debris_node.add_to_group("debris")
-		
-		# Store reward data on the node
-		debris_node.set_meta("dewdrop_reward", item["reward"])
-		debris_node.set_meta("xp_reward", item["xp"])
-		debris_node.set_meta("debris_name", item["name"])
-		
-		# Visual mesh
-		var mesh_instance = MeshInstance3D.new()
-		if item["mesh"] == "box":
-			mesh_instance.mesh = BoxMesh.new()
-		else:
-			mesh_instance.mesh = SphereMesh.new()
-		
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = item["colour"]
-		mat.roughness = 1.0
-		mesh_instance.set_surface_override_material(0, mat)
-		debris_node.add_child(mesh_instance)
-		
-		# Collision shape
-		var collision = CollisionShape3D.new()
-		if item["mesh"] == "box":
-			var box_shape = BoxShape3D.new()
-			box_shape.size = item["scale"]
-			collision.shape = box_shape
-		else:
-			var sphere_shape = SphereShape3D.new()
-			sphere_shape.radius = item["scale"].x * 0.5
-			collision.shape = sphere_shape
-		debris_node.add_child(collision)
-		
-		# Position and transform
-		var x = randf_range(-half + 3, half - 3)
-		var z = randf_range(-half + 3, half - 3)
-# Start high — snap_all_statics() will land them on terrain surface
-		debris_node.position = Vector3(x, 5.0, z)
-		debris_node.rotation.y = randf_range(0, TAU)
-		mesh_instance.scale = item["scale"]
-		# Half-height offset so object sits ON terrain rather than half inside it
-		debris_node.set_meta("snap_y_offset", item["scale"].y * 0.5)
+	var half := starter_area_size / 2.0
+	var base_path := "res://Stylized Nature MegaKit[Standard]/glTF/"
 
-		add_child(debris_node)
+	# ── Load asset pools at runtime (paths have spaces so no preload) ────────────
+	var rock_scenes  : Array[PackedScene] = []
+	var pebble_scenes: Array[PackedScene] = []
+	var log_scenes   : Array[PackedScene] = []
+
+	for i in range(1, 4):   # Rock_Medium_1..3
+		var s := load(base_path + "Rock_Medium_%d.gltf" % i) as PackedScene
+		if s: rock_scenes.append(s)
+
+	for i in range(1, 6):   # Pebble_Round_1..5
+		var s := load(base_path + "Pebble_Round_%d.gltf" % i) as PackedScene
+		if s: pebble_scenes.append(s)
+	for i in range(1, 6):   # Pebble_Square_1..5
+		var s := load(base_path + "Pebble_Square_%d.gltf" % i) as PackedScene
+		if s: pebble_scenes.append(s)
+
+	for i in range(1, 4):   # DeadTree_1..3 — used as small fallen-log stumps
+		var s := load(base_path + "DeadTree_%d.gltf" % i) as PackedScene
+		if s: log_scenes.append(s)
+
+	# ── Debris definition: name, scene pool, scale range, collision r, reward/xp
+	# collision_r is radius of the SphereShape3D used for click detection
+	var groups := [
+		{"name": "Rock",      "scenes": rock_scenes,   "scale_min": 0.55, "scale_max": 1.10,
+		 "col_r": 0.55, "reward": 5.0, "xp": 8.0,  "count": 5},
+		{"name": "SmallRock", "scenes": pebble_scenes, "scale_min": 0.80, "scale_max": 1.60,
+		 "col_r": 0.30, "reward": 3.0, "xp": 5.0,  "count": 6},
+		{"name": "Log",       "scenes": log_scenes,    "scale_min": 0.18, "scale_max": 0.30,
+		 "col_r": 0.45, "reward": 8.0, "xp": 10.0, "count": 4},
+	]
+
+	for group in groups:
+		var pool: Array[PackedScene] = group["scenes"]
+		for j in range(group["count"]):
+			var debris_node := StaticBody3D.new()
+			debris_node.name          = "%s_%d" % [group["name"], j]
+			debris_node.add_to_group("debris")
+			debris_node.set_meta("dewdrop_reward", group["reward"])
+			debris_node.set_meta("xp_reward",      group["xp"])
+			debris_node.set_meta("debris_name",    group["name"])
+
+			# ── Visual — gltf instance if available, fallback sphere ───────────
+			if not pool.is_empty():
+				var visual := pool[randi() % pool.size()].instantiate()
+				var s: float = randf_range(group["scale_min"], group["scale_max"])
+				visual.scale = Vector3(s, s, s)
+				debris_node.add_child(visual)
+			else:
+				var mi := MeshInstance3D.new()
+				mi.mesh = SphereMesh.new()
+				debris_node.add_child(mi)
+
+			# ── Collision — sphere approximation, good enough for clicking ─────
+			var col := CollisionShape3D.new()
+			var sp  := SphereShape3D.new()
+			sp.radius  = group["col_r"]
+			col.shape  = sp
+			debris_node.add_child(col)
+
+			# ── Position — snap to terrain surface via raycast ─────────────────
+			var x := randf_range(-half + 4.0, half - 4.0)
+			var z := randf_range(-half + 4.0, half - 4.0)
+			var ty := _terrain_y(x, z, 0.0)
+			debris_node.position   = Vector3(x, ty, z)
+			debris_node.rotation.y = randf() * TAU
+
+			add_child(debris_node)
 		
 		
 func plant_starting_bushes():
