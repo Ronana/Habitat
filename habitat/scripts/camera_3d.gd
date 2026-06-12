@@ -17,9 +17,11 @@ var max_pitch: float = -10.0
 # Zoom
 var zoom_speed: float = 3.0
 var min_zoom: float = 5.0
-var max_zoom: float = 30.0
-var target_zoom: float = 25.0
-var current_zoom: float = 25.0
+var max_zoom: float = 21.0
+var target_zoom: float = 21.0
+var current_zoom: float = 21.0
+
+const CAMERA_BOUND := 30.0   # starter_area half (20) + 10 overflow units
 
 # Panning with middle mouse
 var is_panning: bool = false
@@ -51,7 +53,11 @@ func _process(delta):
 	handle_keyboard_pan(delta)
 	handle_edge_scroll(delta)
 	handle_zoom(delta)
-	
+
+	# Clamp to play area + overflow allowance
+	focus_point.x = clamp(focus_point.x, -CAMERA_BOUND, CAMERA_BOUND)
+	focus_point.z = clamp(focus_point.z, -CAMERA_BOUND, CAMERA_BOUND)
+
 	# Smooth position
 	global_position = global_position.lerp(target_position, smooth_speed * delta)
 	look_at(focus_point, Vector3.UP)
@@ -118,6 +124,17 @@ func handle_edge_scroll(delta):
 func handle_zoom(delta):
 	current_zoom = lerp(current_zoom, target_zoom, smooth_speed * delta)
 	_update_camera_transform()
+
+## Smoothly pan to a world position and zoom in slightly — called on item select.
+func focus_on(world_pos: Vector3) -> void:
+	var clamped := Vector3(
+		clamp(world_pos.x, -CAMERA_BOUND, CAMERA_BOUND),
+		0.0,
+		clamp(world_pos.z, -CAMERA_BOUND, CAMERA_BOUND)
+	)
+	var tw := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(self, "focus_point", clamped, 0.45)
+	tw.parallel().tween_property(self, "target_zoom", max(min_zoom, target_zoom * 0.80), 0.40)
 
 func _update_camera_transform():
 	var yaw_rad = deg_to_rad(current_yaw)

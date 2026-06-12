@@ -26,10 +26,14 @@ func _ready() -> void:
 	# Random phase so nearby clumps don't sway identically
 	_phase = randf() * TAU
 
-	# Duplicate materials so each clump is independent
-	_mat_a = _get_blade_mat("Blade1")
-	_mat_b = _get_blade_mat("Blade2")
-	_mat_c = _get_blade_mat("Blade6")
+	# Create fresh materials — don't read from the shared mesh resource,
+	# as surface_get_material(0) returns null on SubResource meshes at runtime.
+	_mat_a = StandardMaterial3D.new()
+	_mat_a.roughness = 0.90
+	_mat_b = StandardMaterial3D.new()
+	_mat_b.roughness = 0.90
+	_mat_c = StandardMaterial3D.new()
+	_mat_c.roughness = 0.92
 	_apply_mats_to_blades()
 
 	# Season response
@@ -41,16 +45,6 @@ func _process(delta: float) -> void:
 	# Gentle two-axis sway of the whole clump
 	rotation.z = sin(_time * SWAY_SPEED         + _phase) * SWAY_Z
 	rotation.x = sin(_time * SWAY_SPEED * 0.79  + _phase + 1.4) * SWAY_X
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-func _get_blade_mat(blade_name: String) -> StandardMaterial3D:
-	var node: MeshInstance3D = get_node_or_null(blade_name) as MeshInstance3D
-	if node == null:
-		return StandardMaterial3D.new()
-	var mat: StandardMaterial3D = node.mesh.surface_get_material(0) as StandardMaterial3D
-	if mat == null:
-		return StandardMaterial3D.new()
-	return mat.duplicate() as StandardMaterial3D
 
 func _apply_mats_to_blades() -> void:
 	# A-material (dark): blades 1, 3, 5

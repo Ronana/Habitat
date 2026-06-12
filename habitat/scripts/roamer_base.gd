@@ -102,6 +102,11 @@ var _ring_pulse_timer: float = 0.0
 var _idle_tween: Tween = null
 var _body_rest_y: float = 0.0  # cached body origin Y
 var _is_bobbing: bool = false
+var _in_water: bool = false
+var _water_bob_timer: float = 0.0
+var _water_seek_timer: float = 0.0
+var _is_drinking: bool = false
+var _drink_tween: Tween = null
 
 # Cursor awareness
 var _just_became_idle: bool = false
@@ -362,10 +367,25 @@ func _process(delta):
 		_need_label.position.y = pulse_y
 
 func _physics_process(delta):
-	if not is_on_floor():
+	_in_water = SplatMapManager.is_water_at(global_position)
+
+	if _in_water:
+		# Float on the water surface with a gentle bob
+		_water_bob_timer += delta
+		var target_y := SplatMapManager.WATER_LEVEL + sin(_water_bob_timer * 1.8) * 0.05
+		global_position.y = lerp(global_position.y, target_y, delta * 6.0)
+		velocity.y = 0.0
+	elif not is_on_floor():
 		velocity.y += gravity * delta
 	else:
 		velocity.y = 0.0
+
+	# Occasionally seek nearby water
+	if state == State.WANDERING or state == State.IDLE:
+		_water_seek_timer -= delta
+		if _water_seek_timer <= 0.0:
+			_water_seek_timer = randf_range(18.0, 35.0)
+			_try_seek_water()
 
 	update_needs(delta)
 	update_happiness()
@@ -771,7 +791,11 @@ func handle_idle(delta):
 	velocity.x = 0
 	velocity.z = 0
 	_face_cursor(delta)
+	# Drink when idling at the water's edge
+	if not _in_water and not _is_drinking:
+		_check_drink_from_edge()
 	if idle_timer <= 0:
+		_is_drinking = false
 		pick_wander_target()
 		state = State.WANDERING
 
@@ -813,6 +837,42 @@ func pick_wander_target():
 	new_target.z = clamp(new_target.z, -half_area, half_area)
 	wander_target = new_target
 	wander_timer = randf_range(4.0, 10.0)
+
+## Try to find a water cell nearby and set it as the wander target.
+## Called periodically so roamers are drawn toward ponds.
+func _try_seek_water() -> void:
+	for _attempt in range(12):
+		var angle := randf() * TAU
+		var dist  := randf_range(2.0, 14.0)
+		var candidate := global_position + Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
+		if SplatMapManager.is_water_at(candidate):
+			wander_target = candidate
+			wander_timer  = randf_range(5.0, 10.0)
+			state = State.WANDERING
+			return
+
+## If idling right next to water, play a short drinking head-dip animation.
+func _check_drink_from_edge() -> void:
+	var angles := [0.0, TAU * 0.25, TAU * 0.5, TAU * 0.75]
+	for angle in angles:
+		var probe := global_position + Vector3(cos(angle), 0.0, sin(angle)) * 1.0
+		if SplatMapManager.is_water_at(probe):
+			_is_drinking = true
+			_do_drink_animation()
+			return
+
+func _do_drink_animation() -> void:
+	var body := get_node_or_null("Body")
+	if not body or _is_sleeping:
+		_is_drinking = false
+		return
+	if _drink_tween:
+		_drink_tween.kill()
+	_drink_tween = create_tween().set_trans(Tween.TRANS_SINE).set_loops(3)
+	_drink_tween.tween_property(body, "position:y", _body_rest_y - 0.12, 0.35)
+	_drink_tween.tween_property(body, "position:y", _body_rest_y,         0.30).set_ease(Tween.EASE_OUT)
+	_drink_tween.tween_interval(0.5)
+	_drink_tween.finished.connect(func(): _is_drinking = false)
 
 func move_to(target: Vector3):
 	wander_target = target

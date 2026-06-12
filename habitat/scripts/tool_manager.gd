@@ -8,8 +8,8 @@ enum Tool { NONE, SPADE }
 var active_tool: String = "hand"
 
 var current_tool = Tool.SPADE
-var spade_radius: float = 3.0
-var spade_strength: float = 2.0
+var spade_radius: float = 1.2
+var spade_strength: float = 1.8
 var raise_terrain: bool = true
 var original_material: Material
 var placement_item: String = ""
@@ -36,6 +36,20 @@ var glowing_mushroom_scene: PackedScene = preload("res://scenes/glowing_mushroom
 var firefly_jar_scene: PackedScene      = preload("res://scenes/firefly_jar.tscn")
 var moss_torch_scene: PackedScene       = preload("res://scenes/moss_torch.tscn")
 var _terrain_mat: ShaderMaterial = null
+var _shovel_menu: CanvasLayer = null
+var _pending_hit_pos: Vector3 = Vector3.ZERO
+var _pending_smash_item: Node3D = null
+var _water_plane: MeshInstance3D = null
+var _water_mat:   ShaderMaterial = null
+
+# Y height at which standing water appears when terrain is dug below this level
+const WATER_LEVEL := -0.65
+
+# Shovel brush settings — tight circle for precision
+const DIG_RADIUS   := 1.2
+const DIG_STRENGTH := 1.8
+const POND_RADIUS  := 2.5
+const POND_DEPTH   := -3.2
 
 # Radius (world units) that must be clear around the placement point per item
 const PLACEMENT_RADII: Dictionary = {
@@ -83,8 +97,59 @@ func _ready():
 	await get_tree().process_frame
 	build_mesh_data_tool()
 	apply_terrain_colours()
+	_create_water_plane()
 	snap_all_statics()
 	print("Mesh data tool built successfully")
+
+	# Spawn shovel context menu
+	_shovel_menu = load("res://scripts/shovel_menu.gd").new()
+	get_parent().add_child(_shovel_menu)
+	_shovel_menu.action_selected.connect(_on_shovel_action)
+
+func _create_water_plane() -> void:
+	_water_plane = MeshInstance3D.new()
+	var quad := PlaneMesh.new()
+	quad.size = Vector2(starter_area_size, starter_area_size)
+	_water_plane.mesh = quad
+	_water_plane.position = Vector3(0.0, WATER_LEVEL, 0.0)
+	_water_mat = ShaderMaterial.new()
+	_water_mat.shader = load("res://shaders/water_plane.gdshader")
+	_water_mat.set_shader_parameter("water_mask", SplatMapManager.get_water_texture())
+	# Must match SplatMapManager's WORLD_ORIGIN / WORLD_SIZE constants
+	_water_mat.set_shader_parameter("world_origin", Vector2(-75.0, -75.0))
+	_water_mat.set_shader_parameter("world_size",   Vector2(150.0, 150.0))
+	_water_plane.set_surface_override_material(0, _water_mat)
+	get_parent().add_child(_water_plane)
+
+## After terrain deformation, check whether dug vertices cross the water level
+## and paint / clear the water mask accordingly.
+func _update_water_mask(center: Vector3, radius: float) -> void:
+	var any_submerged := false
+	for i in range(mesh_data_tool.get_vertex_count()):
+		var v := mesh_data_tool.get_vertex(i)
+		var dx := v.x - center.x
+		var dz := v.z - center.z
+		if dx * dx + dz * dz < radius * radius and v.y < WATER_LEVEL:
+			any_submerged = true
+			break
+	if any_submerged:
+		SplatMapManager.paint_water_circle(center, radius)
+		# Paint a mud/dirt transition ring around the water edge
+		SplatMapManager.paint_circle(center, SplatMapManager.LAYER_MUD, radius * 2.0, 0.6)
+	else:
+		# Check if all vertices in range are back above water (terrain was raised)
+		var all_above := true
+		for i in range(mesh_data_tool.get_vertex_count()):
+			var v := mesh_data_tool.get_vertex(i)
+			var dx := v.x - center.x
+			var dz := v.z - center.z
+			if dx * dx + dz * dz < radius * radius and v.y < WATER_LEVEL:
+				all_above = false
+				break
+		if all_above:
+			SplatMapManager.clear_water_circle(center, radius)
+			# Restore grass over the mud ring when water is filled in
+			SplatMapManager.paint_circle(center, SplatMapManager.LAYER_GRASS, radius * 2.2, 0.8)
 
 func build_mesh_data_tool():
 	original_material = ground_mesh.get_active_material(0)
@@ -108,30 +173,22 @@ func _input(event):
 	if not event.pressed:
 		return
 
-	# ── Shovel tool selected from wheel ───────────────────────────────────────
+	# ── Shovel tool: left-click opens context menu at click position ──────────
 	if active_tool == "shovel":
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			raise_terrain = false   # left-click = dig
-			use_spade()
-			get_viewport().set_input_as_handled()
-			return
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			raise_terrain = true    # right-click = raise
-			use_spade()
-			get_viewport().set_input_as_handled()
-			return
-
-	# ── Legacy keyboard modifiers (still work regardless of tool) ─────────────
-	if event.button_index == MOUSE_BUTTON_LEFT:
-		if Input.is_key_pressed(KEY_SHIFT):
-			raise_terrain = false
-			use_spade()
-			get_viewport().set_input_as_handled()
-			return
-		if Input.is_key_pressed(KEY_ALT):
-			raise_terrain = true
-			use_spade()
-			get_viewport().set_input_as_handled()
+			if _shovel_menu and not _shovel_menu._open:
+				var hit := _raycast_terrain()
+				if hit != Vector3.INF:
+					_pending_hit_pos    = hit
+					_pending_smash_item = _find_hittable_item()
+					_shovel_menu.open(get_viewport().get_mouse_position(),
+									  _pending_smash_item != null)
+					# Show selection ring on shovel target before menu is confirmed
+					if _pending_smash_item:
+						var cursor := get_parent().get_node_or_null("PlayerCursor")
+						if cursor:
+							cursor.select_item(_pending_smash_item)
+				get_viewport().set_input_as_handled()
 			return
 
 	# ── Right click — place item if one is selected ───────────────────────────
@@ -165,7 +222,8 @@ func place_item():
 				ui_err.placement_label.text = "❌ Too close to another object!"
 			return
 		# ── Place ──────────────────────────────────────────────────────────────
-		var placed = false
+		var placed      = false
+		var last_placed : Node3D = null
 		match placement_item:
 			"Berry Seeds":
 				if InventoryManager.remove_item("Berry Seeds"):
@@ -173,6 +231,7 @@ func place_item():
 					get_parent().add_child(bush)
 					bush.global_position = result.position
 					WardenManager.gain_xp("bush_planted")
+					last_placed = bush
 					placed = true
 			"Oak Sapling":
 				if InventoryManager.remove_item("Oak Sapling"):
@@ -180,6 +239,7 @@ func place_item():
 					get_parent().add_child(tree)
 					tree.global_position = result.position
 					WardenManager.gain_xp("bush_planted")
+					last_placed = tree
 					placed = true
 			"Basic Shelter":
 				if InventoryManager.remove_item("Basic Shelter"):
@@ -187,6 +247,7 @@ func place_item():
 					get_parent().add_child(shelter)
 					shelter.global_position = result.position
 					WardenManager.gain_xp("shelter_placed")
+					last_placed = shelter
 					placed = true
 			"Wildgrass Seeds":
 				if InventoryManager.remove_item("Wildgrass Seeds"):
@@ -196,6 +257,7 @@ func place_item():
 					grass.rotation.y = randf_range(0.0, TAU)
 					grass.add_to_group("debris")
 					WardenManager.gain_xp("bush_planted")
+					last_placed = grass
 					placed = true
 			"Cosy Burrow":
 				if InventoryManager.remove_item("Cosy Burrow"):
@@ -203,6 +265,7 @@ func place_item():
 					get_parent().add_child(burrow)
 					burrow.global_position = result.position
 					WardenManager.gain_xp("shelter_placed")
+					last_placed = burrow
 					placed = true
 			# ── Decoratives ───────────────────────────────────────────────────
 			"Flower Patch":
@@ -212,7 +275,7 @@ func place_item():
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 			"Mossy Rock":
 				if InventoryManager.remove_item("Mossy Rock"):
 					var item = mossy_rock_scene.instantiate()
@@ -220,7 +283,7 @@ func place_item():
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 			"Mushroom Cluster":
 				if InventoryManager.remove_item("Mushroom Cluster"):
 					var item = mushroom_cluster_scene.instantiate()
@@ -228,7 +291,7 @@ func place_item():
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 			"Fallen Log":
 				if InventoryManager.remove_item("Fallen Log"):
 					var item = fallen_log_scene.instantiate()
@@ -236,7 +299,7 @@ func place_item():
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 			# ── Lighting ──────────────────────────────────────────────────────
 			"Garden Lantern":
 				if InventoryManager.remove_item("Garden Lantern"):
@@ -245,7 +308,7 @@ func place_item():
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 			"Glowing Mushroom":
 				if InventoryManager.remove_item("Glowing Mushroom"):
 					var item = glowing_mushroom_scene.instantiate()
@@ -253,14 +316,14 @@ func place_item():
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 			"Firefly Jar":
 				if InventoryManager.remove_item("Firefly Jar"):
 					var item = firefly_jar_scene.instantiate()
 					get_parent().add_child(item)
 					item.global_position = result.position
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 			"Moss Torch":
 				if InventoryManager.remove_item("Moss Torch"):
 					var item = moss_torch_scene.instantiate()
@@ -268,14 +331,118 @@ func place_item():
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
 					WardenManager.gain_xp("decor_placed")
-					placed = true
+					last_placed = item; placed = true
 		if placed:
+			if last_placed:
+				last_placed.add_to_group("placeable_items")
 			placement_item = ""
 			AudioManager.play_place()
 			var ui = get_parent().get_node_or_null("RoamerUI")
 			if ui:
 				ui.placement_label.modulate = Color(1, 1, 1, 1)
 				ui.placement_label.text = ""
+
+
+## Raycast from mouse (centre + 4 offset rays) looking for a hittable world item.
+## The spread makes items easier to click without needing pixel-perfect aim.
+func _find_hittable_item() -> Node3D:
+	var cam := get_viewport().get_camera_3d()
+	if not cam:
+		return null
+	var mp := get_viewport().get_mouse_position()
+	# Centre + cardinal offsets (pixels) — gives ~20 px tolerance radius
+	var offsets: Array[Vector2] = [
+		Vector2(0, 0),
+		Vector2(18, 0), Vector2(-18, 0),
+		Vector2(0, 18), Vector2(0, -18),
+	]
+	var space := get_world_3d().direct_space_state
+	for off in offsets:
+		var sample  := mp + off
+		var origin  := cam.project_ray_origin(sample)
+		var end     := origin + cam.project_ray_normal(sample) * 200.0
+		var result  := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, end))
+		if not result:
+			continue
+		var node := result.collider as Node
+		while node:
+			if (node.is_in_group("debris") or node.is_in_group("trees") or
+					node.is_in_group("placeable_items") or node.is_in_group("food") or
+					node.is_in_group("shelters")):
+				return node as Node3D
+			node = node.get_parent()
+	return null
+
+func _raycast_terrain() -> Vector3:
+	var cam := get_viewport().get_camera_3d()
+	if not cam:
+		return Vector3.INF
+	var mouse_pos := get_viewport().get_mouse_position()
+	var ray_origin := cam.project_ray_origin(mouse_pos)
+	var ray_end    := ray_origin + cam.project_ray_normal(mouse_pos) * 200.0
+	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
+	var result := get_world_3d().direct_space_state.intersect_ray(query)
+	return result.position if result else Vector3.INF
+
+func _on_shovel_action(action: String) -> void:
+	match action:
+		"dig":
+			_deform_circle(_pending_hit_pos, DIG_RADIUS, DIG_STRENGTH, false)
+		"fill":
+			# Strong fill — VP style, fills a crater in 1-2 clicks
+			_deform_circle(_pending_hit_pos, DIG_RADIUS * 2.5, 12.0, true)
+		"pond":
+			_deform_circle(_pending_hit_pos, POND_RADIUS, absf(POND_DEPTH) * 2.2, false)
+		"smash":
+			if is_instance_valid(_pending_smash_item):
+				var cursor := get_parent().get_node_or_null("PlayerCursor")
+				if cursor:
+					cursor.hit_world_item(_pending_smash_item)
+			_pending_smash_item = null
+
+func _deform_circle(hit_pos: Vector3, radius: float, strength: float, is_raise: bool) -> void:
+	var half := starter_area_size / 2.0
+	if absf(hit_pos.x) > half or absf(hit_pos.z) > half:
+		return
+	WardenManager.gain_xp("terrain_shaped")
+	var direction := 1.0 if is_raise else -1.0
+	# Vertex positions are in mesh local space which matches world XZ when the
+	# Ground node has no scale/offset (standard setup). Compare directly.
+	var affected := false
+	for i in range(mesh_data_tool.get_vertex_count()):
+		var vertex := mesh_data_tool.get_vertex(i)
+		var dist: float = Vector2(vertex.x - hit_pos.x, vertex.z - hit_pos.z).length()
+		if dist < radius:
+			var influence: float = 1.0 - (dist / radius)
+			influence = influence * influence   # smooth falloff
+			var new_y: float = vertex.y + direction * strength * influence
+			if direction < 0:
+				new_y = maxf(new_y, POND_DEPTH)
+			else:
+				new_y = minf(new_y, base_level)
+			vertex.y = new_y
+			mesh_data_tool.set_vertex(i, vertex)
+			affected = true
+	if not affected:
+		return
+	array_mesh.clear_surfaces()
+	mesh_data_tool.commit_to_surface(array_mesh)
+	ground_mesh.mesh = array_mesh.duplicate()
+	apply_terrain_colours()
+	_update_water_mask(hit_pos, radius)
+	update_ground_collision()
+	snap_all_statics()
+	var garden := get_parent()
+	if garden.has_method("update_boundary_heights"):
+		garden.update_boundary_heights()
+
+	# ── Paint splat map to match terrain action ────────────────────────────────
+	if is_raise:
+		# Filling: restore grass over the filled area
+		SplatMapManager.paint_circle(hit_pos, SplatMapManager.LAYER_GRASS, radius, 0.7)
+	else:
+		# Digging: expose dirt
+		SplatMapManager.paint_circle(hit_pos, SplatMapManager.LAYER_DIRT, radius, 1.0)
 
 
 func use_spade():
@@ -330,6 +497,7 @@ func deform_terrain(hit_pos: Vector3):
 	mesh_data_tool.commit_to_surface(array_mesh)
 	ground_mesh.mesh = array_mesh.duplicate()
 	apply_terrain_colours()
+	_update_water_mask(hit_pos, spade_radius)
 	update_ground_collision()
 	snap_all_statics()
 	# Immediately re-conform the boundary to the new terrain shape
@@ -342,50 +510,67 @@ func set_placement_item(item_name: String):
 	print("Ready to place: ", item_name)
 
 func apply_terrain_colours():
-	# Read vertex positions from the current (deformed) mesh
-	var src_arrays = ground_mesh.mesh.surface_get_arrays(0)
+	# Read vertex positions and index buffer from the current (deformed) mesh
+	var src_arrays := ground_mesh.mesh.surface_get_arrays(0)
 	var vertices: PackedVector3Array = src_arrays[Mesh.ARRAY_VERTEX]
 	var indices: PackedInt32Array    = src_arrays[Mesh.ARRAY_INDEX]
 
-	# Compute height-based vertex colour for each vertex
-	var vert_colors: Array[Color] = []
-	vert_colors.resize(vertices.size())
-	for i in range(vertices.size()):
-		var y := vertices[i].y
-		var colour: Color
-		if y > 0.1:
-			var t: float = clamp(y / 1.5, 0.0, 1.0)
-			colour = Color(0.35, 0.50, 0.20).lerp(Color(0.08, 0.18, 0.05), t)
-		elif y < -0.1:
-			var t: float = clamp(abs(y) / 2.0, 0.0, 1.0)
-			colour = Color(0.55, 0.40, 0.22).lerp(Color(0.18, 0.10, 0.05), t)
-		else:
-			colour = Color(0.29, 0.36, 0.18)
-		vert_colors[i] = colour
-
-	# Rebuild via SurfaceTool so generate_normals() recalculates correct normals
-	# after any terrain deformation (MeshDataTool keeps the original flat normals).
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	if indices.size() > 0:
 		for k in range(0, indices.size(), 3):
 			for j in range(3):
-				var vi := indices[k + j]
-				st.set_color(vert_colors[vi])
-				st.add_vertex(vertices[vi])
+				st.add_vertex(vertices[indices[k + j]])
 	else:
 		for vi in range(vertices.size()):
-			st.set_color(vert_colors[vi])
 			st.add_vertex(vertices[vi])
 	st.generate_normals()
 	ground_mesh.mesh = st.commit()
 
-	# Create ShaderMaterial once, reuse every subsequent call
+	# Create ShaderMaterial once, then keep it alive so splat_map is preserved.
 	if _terrain_mat == null:
 		_terrain_mat = ShaderMaterial.new()
-		_terrain_mat.shader = load("res://shaders/terrain.gdshader")
+		_terrain_mat.shader = load("res://shaders/terrain_splat.gdshader")
+
+		# ── Assign textures from the Stylized_GrassAndDirt pack ───────────────
+		var base := "res://Stylized_GrassAndDirt/JPEG/"
+		_terrain_mat.set_shader_parameter("grass_albedo",
+			load(base + "Stylized_HandpaintedGrass_01/Stylized_HandpaintedGrass_01_basecolor.jpg"))
+		_terrain_mat.set_shader_parameter("grass_normal",
+			load(base + "Stylized_HandpaintedGrass_01/Stylized_HandpaintedGrass_01_normalogl.jpg"))
+		_terrain_mat.set_shader_parameter("grass_height",
+			load(base + "Stylized_HandpaintedGrass_01/Stylized_HandpaintedGrass_01_height.jpg"))
+		_terrain_mat.set_shader_parameter("grass_albedo2",
+			load(base + "Stylized_HandpaintedGrass_02/Stylized_HandpaintedGrass_02_basecolor.jpg"))
+		_terrain_mat.set_shader_parameter("grass_normal2",
+			load(base + "Stylized_HandpaintedGrass_02/Stylized_HandpaintedGrass_02_normalogl.jpg"))
+		_terrain_mat.set_shader_parameter("dirt_albedo",
+			load(base + "Stylized_HandpaintedDirt_01/Stylized_HandpaintedDirt_01_basecolor.jpg"))
+		_terrain_mat.set_shader_parameter("dirt_normal",
+			load(base + "Stylized_HandpaintedDirt_01/Stylized_HandpaintedDirt_01_normalogl.jpg"))
+		_terrain_mat.set_shader_parameter("dirt_height",
+			load(base + "Stylized_HandpaintedDirt_01/Stylized_HandpaintedDirt_01_height.jpg"))
+		_terrain_mat.set_shader_parameter("mud_albedo",
+			load(base + "Stylized_HandpaintedSand_01/Stylized_HandpaintedSand_01_basecolor.jpg"))
+		_terrain_mat.set_shader_parameter("mud_normal",
+			load(base + "Stylized_HandpaintedSand_01/Stylized_HandpaintedSand_01_normalogl.jpg"))
+		_terrain_mat.set_shader_parameter("mud_height",
+			load(base + "Stylized_HandpaintedSand_01/Stylized_HandpaintedSand_01_height.jpg"))
+
+		# Tiling scale
+		_terrain_mat.set_shader_parameter("grass_scale", 0.22)
+		_terrain_mat.set_shader_parameter("dirt_scale",  0.22)
+		_terrain_mat.set_shader_parameter("mud_scale",   0.20)
+
+		# Colour tints — multiply against each texture to correct hue/saturation
+		# Grass: reduce the lime-yellow, push toward a richer softer green
+		_terrain_mat.set_shader_parameter("grass_tint", Color(0.72, 0.88, 0.56))
+		_terrain_mat.set_shader_parameter("dirt_tint",  Color(1.00, 1.00, 1.00))
+		_terrain_mat.set_shader_parameter("mud_tint",   Color(1.00, 1.00, 1.00))
+
+	# Always refresh the splat map texture (it changes as the player paints terrain)
+	_terrain_mat.set_shader_parameter("splat_map", SplatMapManager.get_texture())
 	ground_mesh.set_surface_override_material(0, _terrain_mat)
-	# NOTE: update_ground_collision() is called by deform_terrain() after this returns.
 
 func update_ground_collision():
 	# Update the shape in-place — no queue_free/await so there's never a
