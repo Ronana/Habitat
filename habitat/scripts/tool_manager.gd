@@ -11,16 +11,13 @@ var current_tool = Tool.SPADE
 var spade_radius: float = 1.2
 var spade_strength: float = 1.8
 var raise_terrain: bool = true
-var original_material: Material
 var placement_item: String = ""
 var berry_bush_scene: PackedScene = preload("res://scenes/berry_bush.tscn")
 var tree_scene: PackedScene = preload("res://scenes/tree.tscn")
 var base_level: float = 0.0
 var max_dig_depth: float = -2.0
 var can_raise_terrain: bool = false
-var ground_mesh: MeshInstance3D
-var mesh_data_tool: MeshDataTool
-var array_mesh: ArrayMesh
+var terrain3d: Terrain3D        # Terrain3D plugin node (replaces old Ground MeshInstance3D)
 var starter_area_size: float = 40.0
 var shelter_scene: PackedScene    = preload("res://scenes/shelter.tscn")
 var wildgrass_scene: PackedScene  = preload("res://scenes/wildgrass.tscn")
@@ -35,7 +32,6 @@ var garden_lantern_scene: PackedScene   = preload("res://scenes/garden_lantern.t
 var glowing_mushroom_scene: PackedScene = preload("res://scenes/glowing_mushroom.tscn")
 var firefly_jar_scene: PackedScene      = preload("res://scenes/firefly_jar.tscn")
 var moss_torch_scene: PackedScene       = preload("res://scenes/moss_torch.tscn")
-var _terrain_mat: ShaderMaterial = null
 var _shovel_menu: CanvasLayer = null
 var _pending_hit_pos: Vector3 = Vector3.ZERO
 var _pending_smash_item: Node3D = null
@@ -92,14 +88,18 @@ func is_placement_clear(pos: Vector3, item_name: String) -> bool:
 	return true
 
 func _ready():
-	ground_mesh = get_parent().get_node("Ground")
+	# Terrain3D node must be added to the scene manually (see setup guide).
+	# The node should be named "Terrain3D" and be a child of the garden root.
+	terrain3d = get_parent().get_node_or_null("Terrain3D")
+	if terrain3d == null:
+		push_warning("ToolManager: No Terrain3D node found! Add a Terrain3D node to the scene named 'Terrain3D'.")
+	# Wait for the parent scene to finish adding all its children before we
+	# try to add_child ourselves (avoids "parent is busy" errors).
 	await get_tree().process_frame
 	await get_tree().process_frame
-	build_mesh_data_tool()
-	apply_terrain_colours()
 	_create_water_plane()
 	snap_all_statics()
-	print("Mesh data tool built successfully")
+	print("ToolManager ready — using Terrain3D for terrain.")
 
 	# Spawn shovel context menu
 	_shovel_menu = load("res://scripts/shovel_menu.gd").new()
@@ -121,47 +121,57 @@ func _create_water_plane() -> void:
 	_water_plane.set_surface_override_material(0, _water_mat)
 	get_parent().add_child(_water_plane)
 
-## After terrain deformation, check whether dug vertices cross the water level
+## After terrain deformation, check whether any dug point is below water level
 ## and paint / clear the water mask accordingly.
+## Uses Terrain3D height queries instead of MeshDataTool vertex iteration.
 func _update_water_mask(center: Vector3, radius: float) -> void:
+	if terrain3d == null or not is_instance_valid(terrain3d):
+		return
+	var step := 1.0   # sample every 1 world unit — matches default vertex_spacing
+	var r2    := radius * radius
 	var any_submerged := false
-	for i in range(mesh_data_tool.get_vertex_count()):
-		var v := mesh_data_tool.get_vertex(i)
-		var dx := v.x - center.x
-		var dz := v.z - center.z
-		if dx * dx + dz * dz < radius * radius and v.y < WATER_LEVEL:
-			any_submerged = true
+
+	var x := center.x - radius
+	while x <= center.x + radius:
+		var z := center.z - radius
+		while z <= center.z + radius:
+			var dx := x - center.x
+			var dz := z - center.z
+			if dx * dx + dz * dz <= r2:
+				var h := terrain3d.data.get_height(Vector3(x, 0.0, z))
+				if not is_nan(h) and h < WATER_LEVEL:
+					any_submerged = true
+					break
+			z += step
+		if any_submerged:
 			break
+		x += step
+
 	if any_submerged:
 		SplatMapManager.paint_water_circle(center, radius)
-		# Paint a mud/dirt transition ring around the water edge
 		SplatMapManager.paint_circle(center, SplatMapManager.LAYER_MUD, radius * 2.0, 0.6)
 	else:
-		# Check if all vertices in range are back above water (terrain was raised)
+		# Re-scan: if everything is back above water, clear the mask
 		var all_above := true
-		for i in range(mesh_data_tool.get_vertex_count()):
-			var v := mesh_data_tool.get_vertex(i)
-			var dx := v.x - center.x
-			var dz := v.z - center.z
-			if dx * dx + dz * dz < radius * radius and v.y < WATER_LEVEL:
-				all_above = false
+		x = center.x - radius
+		while x <= center.x + radius:
+			var z := center.z - radius
+			while z <= center.z + radius:
+				var dx := x - center.x
+				var dz := z - center.z
+				if dx * dx + dz * dz <= r2:
+					var h := terrain3d.data.get_height(Vector3(x, 0.0, z))
+					if not is_nan(h) and h < WATER_LEVEL:
+						all_above = false
+						break
+				z += step
+			if not all_above:
 				break
+			x += step
 		if all_above:
 			SplatMapManager.clear_water_circle(center, radius)
-			# Restore grass over the mud ring when water is filled in
 			SplatMapManager.paint_circle(center, SplatMapManager.LAYER_GRASS, radius * 2.2, 0.8)
 
-func build_mesh_data_tool():
-	original_material = ground_mesh.get_active_material(0)
-	array_mesh = ArrayMesh.new()
-	array_mesh.add_surface_from_arrays(
-		Mesh.PRIMITIVE_TRIANGLES,
-		ground_mesh.mesh.surface_get_arrays(0)
-	)
-	mesh_data_tool = MeshDataTool.new()
-	mesh_data_tool.create_from_surface(array_mesh, 0)
-	update_ground_collision()
-	
 
 ## Called by the tool wheel when the player selects a tool.
 func set_active_tool(tool_id: String) -> void:
@@ -401,193 +411,109 @@ func _on_shovel_action(action: String) -> void:
 			_pending_smash_item = null
 
 func _deform_circle(hit_pos: Vector3, radius: float, strength: float, is_raise: bool) -> void:
+	if terrain3d == null or not is_instance_valid(terrain3d):
+		push_warning("ToolManager: Terrain3D node not found — cannot deform terrain.")
+		return
 	var half := starter_area_size / 2.0
 	if absf(hit_pos.x) > half or absf(hit_pos.z) > half:
 		return
 	WardenManager.gain_xp("terrain_shaped")
-	var direction := 1.0 if is_raise else -1.0
-	# Vertex positions are in mesh local space which matches world XZ when the
-	# Ground node has no scale/offset (standard setup). Compare directly.
-	var affected := false
-	for i in range(mesh_data_tool.get_vertex_count()):
-		var vertex := mesh_data_tool.get_vertex(i)
-		var dist: float = Vector2(vertex.x - hit_pos.x, vertex.z - hit_pos.z).length()
-		if dist < radius:
-			var influence: float = 1.0 - (dist / radius)
-			influence = influence * influence   # smooth falloff
-			var new_y: float = vertex.y + direction * strength * influence
-			if direction < 0:
-				new_y = maxf(new_y, POND_DEPTH)
-			else:
-				new_y = minf(new_y, base_level)
-			vertex.y = new_y
-			mesh_data_tool.set_vertex(i, vertex)
-			affected = true
-	if not affected:
+
+	var direction    := 1.0 if is_raise else -1.0
+	var region_size  := terrain3d.get_region_size()   # default 1024
+	var v_spacing    := terrain3d.get_vertex_spacing() # default 1.0
+	var step         := maxf(v_spacing, 0.5)
+
+	# Cache of modified region heightmap images, keyed by region location Vector2i
+	var dirty_regions: Dictionary = {}
+
+	var x := hit_pos.x - radius - step
+	while x <= hit_pos.x + radius + step:
+		var z := hit_pos.z - radius - step
+		while z <= hit_pos.z + radius + step:
+			var wp  := Vector3(x, 0.0, z)
+			var dist: float = Vector2(x - hit_pos.x, z - hit_pos.z).length()
+			if dist <= radius:
+				_sculpt_point(wp, dist, radius, direction, strength, region_size, v_spacing, dirty_regions)
+			z += step
+		x += step
+
+	if dirty_regions.is_empty():
 		return
-	array_mesh.clear_surfaces()
-	mesh_data_tool.commit_to_surface(array_mesh)
-	ground_mesh.mesh = array_mesh.duplicate()
-	apply_terrain_colours()
+
+	# Rebuild GPU heightmap textures for all touched regions
+	terrain3d.data.update_maps(Terrain3DRegion.TYPE_HEIGHT, true, false)
+
 	_update_water_mask(hit_pos, radius)
-	update_ground_collision()
 	snap_all_statics()
 	var garden := get_parent()
 	if garden.has_method("update_boundary_heights"):
 		garden.update_boundary_heights()
 
-	# ── Paint splat map to match terrain action ────────────────────────────────
 	if is_raise:
-		# Filling: restore grass over the filled area
 		SplatMapManager.paint_circle(hit_pos, SplatMapManager.LAYER_GRASS, radius, 0.7)
 	else:
-		# Digging: expose dirt
 		SplatMapManager.paint_circle(hit_pos, SplatMapManager.LAYER_DIRT, radius, 1.0)
 
 
-func use_spade():
-	print("use_spade called")
-	var cam = get_viewport().get_camera_3d()
-	if not cam:
-		print("ERROR: No camera")
+## Modify a single terrain heightmap pixel at the given world position.
+## dirty_regions caches Image references so we only call get_map() once per region.
+func _sculpt_point(
+		world_pos:      Vector3,
+		dist:           float,
+		radius:         float,
+		direction:      float,
+		strength:       float,
+		region_size:    int,
+		v_spacing:      float,
+		dirty_regions:  Dictionary) -> void:
+
+	# get_regionp returns null if no region exists at this position
+	var region: Terrain3DRegion = terrain3d.data.get_regionp(world_pos)
+	if region == null:
 		return
-	var mouse_pos = get_viewport().get_mouse_position()
-	var ray_origin = cam.project_ray_origin(mouse_pos)
-	var ray_end = ray_origin + cam.project_ray_normal(mouse_pos) * 200.0
-	var space_state = get_world_3d().direct_space_state
-	var query = PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
-	var result = space_state.intersect_ray(query)
-	if result:
-		print("Ray hit: ", result.collider.name, " at ", result.position)
-		var hit_pos = result.position
-		deform_terrain(hit_pos)
+
+	# Current height (NaN if the region has no data there yet)
+	var current_h := terrain3d.data.get_height(world_pos)
+	if is_nan(current_h):
+		current_h = 0.0
+
+	# Smooth falloff: quadratic ease-in from edge → centre
+	var influence := pow(1.0 - dist / radius, 2.0)
+	var new_h     := current_h + direction * strength * influence * 0.05
+
+	if direction < 0:
+		new_h = maxf(new_h, POND_DEPTH)  # don't dig below pond floor
 	else:
-		print("Ray hit nothing")
+		new_h = minf(new_h, 6.0)          # can raise up to 6 m
 
-func deform_terrain(hit_pos: Vector3):
-	var half = starter_area_size / 2.0
-	if abs(hit_pos.x) > half or abs(hit_pos.z) > half:
-		print("Outside playable area")
-		return
-	WardenManager.gain_xp("terrain_shaped")
-	var direction = 1.0 if raise_terrain else -1.0
-	var _vertices_affected := 0
+	# ── Convert world position → pixel coordinates within the region ──────────
+	var region_loc: Vector2i = terrain3d.data.get_region_location(world_pos)
 
-	for i in range(mesh_data_tool.get_vertex_count()):
-		var vertex = mesh_data_tool.get_vertex(i)
-		var distance = Vector2(vertex.x - hit_pos.x, vertex.z - hit_pos.z).length()
+	var hmap: Image
+	if dirty_regions.has(region_loc):
+		hmap = dirty_regions[region_loc]
+	else:
+		hmap = region.get_map(Terrain3DRegion.TYPE_HEIGHT)
+		dirty_regions[region_loc] = hmap
 
-		if distance < spade_radius:
-			var influence = 1.0 - (distance / spade_radius)
-			var new_y = vertex.y + (direction * spade_strength * influence)
-			
-			# Enforce limits
-			if direction > 0 and not can_raise_terrain:
-				# Can only raise up to base level with basic shovel
-				new_y = min(new_y, base_level)
-			if direction < 0:
-				# Can't dig below max depth
-				new_y = max(new_y, max_dig_depth)
-			
-			vertex.y = new_y
-			mesh_data_tool.set_vertex(i, vertex)
-			_vertices_affected += 1
+	# Region world-space origin (bottom-left corner in XZ)
+	var origin_x := region_loc.x * region_size * v_spacing
+	var origin_z := region_loc.y * region_size * v_spacing
+	var lx := clampi(int((world_pos.x - origin_x) / v_spacing), 0, region_size - 1)
+	var lz := clampi(int((world_pos.z - origin_z) / v_spacing), 0, region_size - 1)
 
-	array_mesh.clear_surfaces()
-	mesh_data_tool.commit_to_surface(array_mesh)
-	ground_mesh.mesh = array_mesh.duplicate()
-	apply_terrain_colours()
-	_update_water_mask(hit_pos, spade_radius)
-	update_ground_collision()
-	snap_all_statics()
-	# Immediately re-conform the boundary to the new terrain shape
-	var garden = get_parent()
-	if garden.has_method("update_boundary_heights"):
-		garden.update_boundary_heights()
+	# Terrain3D stores heights as FORMAT_RF — raw float in the R channel (metres)
+	hmap.set_pixel(lx, lz, Color(new_h, 0.0, 0.0, 1.0))
+
+
 
 func set_placement_item(item_name: String):
 	placement_item = item_name
 	print("Ready to place: ", item_name)
 
-func apply_terrain_colours():
-	# Read vertex positions and index buffer from the current (deformed) mesh
-	var src_arrays := ground_mesh.mesh.surface_get_arrays(0)
-	var vertices: PackedVector3Array = src_arrays[Mesh.ARRAY_VERTEX]
-	var indices: PackedInt32Array    = src_arrays[Mesh.ARRAY_INDEX]
-
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	if indices.size() > 0:
-		for k in range(0, indices.size(), 3):
-			for j in range(3):
-				st.add_vertex(vertices[indices[k + j]])
-	else:
-		for vi in range(vertices.size()):
-			st.add_vertex(vertices[vi])
-	st.generate_normals()
-	ground_mesh.mesh = st.commit()
-
-	# Create ShaderMaterial once, then keep it alive so splat_map is preserved.
-	if _terrain_mat == null:
-		_terrain_mat = ShaderMaterial.new()
-		_terrain_mat.shader = load("res://shaders/terrain_splat.gdshader")
-
-		# ── Assign textures from the Stylized_GrassAndDirt pack ───────────────
-		var base := "res://Stylized_GrassAndDirt/JPEG/"
-		_terrain_mat.set_shader_parameter("grass_albedo",
-			load(base + "Stylized_HandpaintedGrass_01/Stylized_HandpaintedGrass_01_basecolor.jpg"))
-		_terrain_mat.set_shader_parameter("grass_normal",
-			load(base + "Stylized_HandpaintedGrass_01/Stylized_HandpaintedGrass_01_normalogl.jpg"))
-		_terrain_mat.set_shader_parameter("grass_height",
-			load(base + "Stylized_HandpaintedGrass_01/Stylized_HandpaintedGrass_01_height.jpg"))
-		_terrain_mat.set_shader_parameter("grass_albedo2",
-			load(base + "Stylized_HandpaintedGrass_02/Stylized_HandpaintedGrass_02_basecolor.jpg"))
-		_terrain_mat.set_shader_parameter("grass_normal2",
-			load(base + "Stylized_HandpaintedGrass_02/Stylized_HandpaintedGrass_02_normalogl.jpg"))
-		_terrain_mat.set_shader_parameter("dirt_albedo",
-			load(base + "Stylized_HandpaintedDirt_01/Stylized_HandpaintedDirt_01_basecolor.jpg"))
-		_terrain_mat.set_shader_parameter("dirt_normal",
-			load(base + "Stylized_HandpaintedDirt_01/Stylized_HandpaintedDirt_01_normalogl.jpg"))
-		_terrain_mat.set_shader_parameter("dirt_height",
-			load(base + "Stylized_HandpaintedDirt_01/Stylized_HandpaintedDirt_01_height.jpg"))
-		_terrain_mat.set_shader_parameter("mud_albedo",
-			load(base + "Stylized_HandpaintedSand_01/Stylized_HandpaintedSand_01_basecolor.jpg"))
-		_terrain_mat.set_shader_parameter("mud_normal",
-			load(base + "Stylized_HandpaintedSand_01/Stylized_HandpaintedSand_01_normalogl.jpg"))
-		_terrain_mat.set_shader_parameter("mud_height",
-			load(base + "Stylized_HandpaintedSand_01/Stylized_HandpaintedSand_01_height.jpg"))
-
-		# Tiling scale
-		_terrain_mat.set_shader_parameter("grass_scale", 0.22)
-		_terrain_mat.set_shader_parameter("dirt_scale",  0.22)
-		_terrain_mat.set_shader_parameter("mud_scale",   0.20)
-
-		# Colour tints — multiply against each texture to correct hue/saturation
-		# Grass: reduce the lime-yellow, push toward a richer softer green
-		_terrain_mat.set_shader_parameter("grass_tint", Color(0.72, 0.88, 0.56))
-		_terrain_mat.set_shader_parameter("dirt_tint",  Color(1.00, 1.00, 1.00))
-		_terrain_mat.set_shader_parameter("mud_tint",   Color(1.00, 1.00, 1.00))
-
-	# Always refresh the splat map texture (it changes as the player paints terrain)
-	_terrain_mat.set_shader_parameter("splat_map", SplatMapManager.get_texture())
-	ground_mesh.set_surface_override_material(0, _terrain_mat)
-
-func update_ground_collision():
-	# Update the shape in-place — no queue_free/await so there's never a
-	# frame gap where ground collision is absent (which causes is_on_floor()
-	# to flicker and roamers to fall through).
-	var static_body = ground_mesh.get_node_or_null("StaticBody3D")
-	if not static_body:
-		static_body = StaticBody3D.new()
-		static_body.name = "StaticBody3D"
-		ground_mesh.add_child(static_body)
-
-	var collision_shape = static_body.get_node_or_null("CollisionShape3D")
-	if not collision_shape:
-		collision_shape = CollisionShape3D.new()
-		static_body.add_child(collision_shape)
-
-	collision_shape.shape = ground_mesh.mesh.create_trimesh_shape()
+## Terrain3D handles its own normals, collision, and rendering.
+## apply_terrain_colours() and update_ground_collision() are no longer needed.
 
 func snap_all_statics():
 	var space_state = get_world_3d().direct_space_state

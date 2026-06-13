@@ -46,6 +46,13 @@ func _refresh_cursor() -> void:
 	var result := get_world_3d().direct_space_state.intersect_ray(query)
 	if result:
 		cursor_world_pos = result.position
+	else:
+		# Terrain3D collision not hit — fall back to Y=0 world plane so the
+		# cursor ring always tracks the mouse even before collision is ready.
+		var plane := Plane(Vector3.UP, 0.0)
+		var hit = plane.intersects_ray(origin, cam.project_ray_normal(mp))
+		if hit != null:
+			cursor_world_pos = hit
 
 func _collect_rids(node: Node, out: Array[RID]) -> void:
 	if node is PhysicsBody3D:

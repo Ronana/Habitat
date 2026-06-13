@@ -29,9 +29,14 @@ ParticleManager="*res://scripts/particle_manager.gd"
 MilestoneManager="*res://scripts/milestone_manager.gd"
 SettingsManager="*res://scripts/settings_manager.gd"
 ObjectiveManager="*res://scripts/objective_manager.gd"
-SplatMapManager="*res://scripts/splat_map_manager.gd"
 PrestigeManager="*res://scripts/prestige_manager.gd"
 TutorialManager="*res://scripts/tutorial_manager.gd"
+SplatMapManager="*res://scripts/splat_map_manager.gd"
+PhantomCameraManager="*uid://duq6jhf6unyis"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/phantom_camera/plugin.cfg", "res://addons/proton_scatter/plugin.cfg", "res://addons/terrain_3d/plugin.cfg")
 
 [physics]
 

@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://bulyelcq78ud6"]
+
+[ext_resource type="PackedScene" uid="uid://boxq82rgpommi" path="res://assets/foliage/pine_roots_2k.gltf/pine_roots_2k.gltf" id="1_x1io7"]
+[ext_resource type="Texture2D" uid="uid://cvlmsirvqu34x" path="res://rocky_terrain_02_4k.blend/textures/rocky_terrain_02_diff_4k.jpg" id="2_nsewc"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ppsyj"]
+albedo_color = Color(3.4255767, 3.4255767, 3.4255767, 1)
+albedo_texture = ExtResource("2_nsewc")
+albedo_texture_force_srgb = true
+
+[node name="pine_roots_2k" unique_id=830301339 instance=ExtResource("1_x1io7")]
+
+[node name="pine_roots_b" parent="." index="0" unique_id=631286433]
+material_overlay = SubResource("StandardMaterial3D_ppsyj")

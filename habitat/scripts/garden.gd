@@ -64,10 +64,7 @@ func _ready():
 		if scene:
 			_tree_scenes.append(scene)
 
-	# Build terrain + collision first so all scatter functions can snap to ground
-	create_starter_bumps()
-	_apply_ground_shader()
-
+	# Terrain3D handles the terrain — scatter functions snap via raycasts against its collision
 	scatter_trees()
 	create_boundary()
 	_scatter_outer_forest()
@@ -187,83 +184,24 @@ func scatter_trees() -> void:
 		tree.rotation.y = randf_range(0.0, TAU)
 
 
-var _ground_mat: ShaderMaterial = null
-
-# Season terrain colours  [dark, mid, bright] — used by legacy ground shader
-const SEASON_TERRAIN := {
-	0: [Color(0.18, 0.42, 0.11), Color(0.26, 0.54, 0.17), Color(0.36, 0.66, 0.24)],
-	1: [Color(0.11, 0.36, 0.08), Color(0.18, 0.46, 0.12), Color(0.26, 0.58, 0.18)],
-	2: [Color(0.38, 0.38, 0.12), Color(0.48, 0.46, 0.16), Color(0.58, 0.52, 0.22)],
-	3: [Color(0.18, 0.26, 0.14), Color(0.24, 0.32, 0.18), Color(0.30, 0.38, 0.22)],
-}
-
-func _apply_ground_shader() -> void:
-	_apply_ground_shader_legacy()
-
-## Procedural ground shader.
-func _apply_ground_shader_legacy() -> void:
-	var ground: MeshInstance3D = get_node_or_null("Ground") as MeshInstance3D
-	if ground == null:
-		return
-	var shader := Shader.new()
-	shader.code = """
-shader_type spatial;
-render_mode depth_draw_opaque;
-uniform vec4  col_dark   : source_color = vec4(0.15, 0.38, 0.09, 1.0);
-uniform vec4  col_mid    : source_color = vec4(0.24, 0.50, 0.15, 1.0);
-uniform vec4  col_bright : source_color = vec4(0.34, 0.62, 0.22, 1.0);
-uniform vec4  col_dirt   : source_color = vec4(0.38, 0.28, 0.16, 1.0);
-uniform float uv_scale        = 22.0;
-uniform float wind_speed      = 0.22;
-uniform float normal_strength = 0.55;
-float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-float vnoise(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
-float fbm(vec2 p){float v=0.0;float a=0.5;for(int i=0;i<5;i++){v+=vnoise(p)*a;p=p*2.1+vec2(1.7,9.2);a*=0.48;}return v;}
-varying float v_height; varying vec2 v_world_xz;
-void vertex(){v_height=VERTEX.y;v_world_xz=(MODEL_MATRIX*vec4(VERTEX,1.0)).xz;}
-void fragment(){
-	vec2 uv=UV*uv_scale; float ripple=sin(TIME*wind_speed+uv.y*0.35)*0.022; vec2 uv_w=uv+vec2(ripple,0.0);
-	float g=fbm(uv_w*0.17)*0.40+fbm(uv_w*0.68)*0.30+vnoise(uv_w*2.90)*0.20+vnoise(uv*7.50+vec2(31.1,17.3))*0.10;
-	vec3 col=g<0.45?mix(col_dark.rgb,col_mid.rgb,g/0.45):mix(col_mid.rgb,col_bright.rgb,(g-0.45)/0.55);
-	float h_norm=clamp(v_height/2.2,0.0,1.0); col=mix(col*0.75,col,0.30+h_norm*0.70);
-	float dirt=smoothstep(5.5,1.5,length(v_world_xz))*0.60; col=mix(col,col_dirt.rgb,dirt*(1.0-h_norm*0.6));
-	float roughness=mix(0.94,0.80,clamp(h_norm*2.0-0.4,0.0,1.0)); roughness=mix(roughness,0.87,dirt*0.5);
-	float eps=0.45; NORMAL_MAP=normalize(vec3(-(fbm(uv_w+vec2(eps,0))-fbm(uv_w-vec2(eps,0))),-(fbm(uv_w+vec2(0,eps))-fbm(uv_w-vec2(0,eps))),1.0/max(normal_strength,0.01))); NORMAL_MAP_DEPTH=normal_strength;
-	ALBEDO=col; ROUGHNESS=roughness; SPECULAR=0.06; METALLIC=0.0;
-}
-"""
-	_ground_mat = ShaderMaterial.new()
-	_ground_mat.shader = shader
-	var sd: Array = SEASON_TERRAIN.get(SeasonManager.current_season, SEASON_TERRAIN[0])
-	_ground_mat.set_shader_parameter("col_dark",   sd[0])
-	_ground_mat.set_shader_parameter("col_mid",    sd[1])
-	_ground_mat.set_shader_parameter("col_bright", sd[2])
-	ground.set_surface_override_material(0, _ground_mat)
-	if not SeasonManager.season_changed.is_connected(_on_terrain_season_changed):
-		SeasonManager.season_changed.connect(_on_terrain_season_changed)
-
-func _on_terrain_season_changed(season: int) -> void:
-	if _ground_mat == null:
-		return
-	var sd: Array = SEASON_TERRAIN.get(season, SEASON_TERRAIN[0])
-	var tw := create_tween().set_parallel(true)
-	var from_d: Color = _ground_mat.get_shader_parameter("col_dark")
-	var from_m: Color = _ground_mat.get_shader_parameter("col_mid")
-	var from_b: Color = _ground_mat.get_shader_parameter("col_bright")
-	tw.tween_method(func(c: Color): _ground_mat.set_shader_parameter("col_dark",   c), from_d, sd[0], 3.0)
-	tw.tween_method(func(c: Color): _ground_mat.set_shader_parameter("col_mid",    c), from_m, sd[1], 3.0)
-	tw.tween_method(func(c: Color): _ground_mat.set_shader_parameter("col_bright", c), from_b, sd[2], 3.0)
 
 func create_boundary():
+	# In the editor use tall bright orange posts so the boundary is clearly visible.
+	# At runtime use the low decorative strip.
+	var is_editor := Engine.is_editor_hint()
+
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.78, 0.88, 0.62, 1.0)
-	mat.roughness    = 1.0
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if is_editor:
+		mat.albedo_color = Color(1.0, 0.55, 0.05, 1.0)   # bright orange
+	else:
+		mat.albedo_color = Color(0.78, 0.88, 0.62, 1.0)
+	mat.roughness = 1.0
 
 	var half      := starter_area_size / 2.0
 	var seg       := 2.0
-	var thickness := 0.12
-	var height    := 0.06
+	var thickness := 0.12 if not is_editor else 0.20
+	var height    := 0.06 if not is_editor else 1.50   # tall in editor so it's visible
 	var count     := int(starter_area_size / seg)
 
 	for i in range(count):
@@ -276,13 +214,16 @@ func create_boundary():
 func _add_boundary_segment(pos: Vector3, size: Vector3, mat: StandardMaterial3D, run_axis: String) -> void:
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size   = size
-	mi.mesh   = bm
+	bm.size     = size
+	mi.mesh     = bm
 	mi.position = pos
 	mi.set_meta("run_axis", run_axis)
 	mi.set_surface_override_material(0, mat)
 	mi.add_to_group("boundary_lines")
 	add_child(mi)
+	# Owner must be set for the node to appear in the editor scene tree
+	if Engine.is_editor_hint() and get_tree():
+		mi.owner = get_tree().edited_scene_root
 
 ## ── Sky shader setup ──────────────────────────────────────────────────────────
 func _setup_sky(env: Environment) -> void:
@@ -367,69 +308,11 @@ func _setup_sky(env: Environment) -> void:
 	env.sky            = sky
 	env.background_mode = Environment.BG_SKY
 
-## ── Terrain noise helpers ─────────────────────────────────────────────────────
-func _th(px: float, pz: float) -> float:
-	return fmod(abs(sin(px * 127.1 + pz * 311.7) * 43758.5453), 1.0)
+## Terrain generation is now handled by Terrain3D in the editor.
+## Sculpt the terrain using Terrain3D's built-in sculpting tools,
+## then save the TerrainData resource. At runtime Terrain3D provides
+## collision automatically — no code needed here.
 
-func _tvn(px: float, pz: float) -> float:
-	var ix: float = floor(px); var iz: float = floor(pz)
-	var fx: float = px - ix;   var fz: float = pz - iz
-	fx = fx * fx * (3.0 - 2.0 * fx)
-	fz = fz * fz * (3.0 - 2.0 * fz)
-	return lerp(lerp(_th(ix, iz), _th(ix + 1.0, iz), fx),
-				lerp(_th(ix, iz + 1.0), _th(ix + 1.0, iz + 1.0), fx), fz)
-
-func _tfbm(px: float, pz: float) -> float:
-	var v := 0.0; var a := 0.5; var x := px; var z := pz
-	for _i in range(6):
-		v += _tvn(x, z) * a
-		x = x * 2.1 + 1.7; z = z * 2.1 + 9.2; a *= 0.48
-	return v
-
-func create_starter_bumps() -> void:
-	var ground_node: MeshInstance3D = get_node("Ground") as MeshInstance3D
-	var mdt := MeshDataTool.new()
-	var arr_mesh := ArrayMesh.new()
-	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,
-		ground_node.mesh.surface_get_arrays(0))
-	mdt.create_from_surface(arr_mesh, 0)
-
-	for i in range(mdt.get_vertex_count()):
-		var v := mdt.get_vertex(i)
-		# Multi-octave smooth terrain: large rolling hills + medium undulation + fine bumps
-		var h: float = _tfbm(v.x * 0.045, v.z * 0.045) * 1.7 \
-			   + _tvn( v.x * 0.14,  v.z * 0.14)  * 0.50 \
-			   + _tvn( v.x * 0.38,  v.z * 0.38)  * 0.13
-		# Flat clearing at origin (player/Maren area) — smoothly eased
-		var cd: float = clamp(Vector2(v.x, v.z).length() / 9.0, 0.0, 1.0)
-		cd = cd * cd * (3.0 - 2.0 * cd)
-		h *= cd
-		# Taper to flat at map edges so there are no abrupt drop-offs
-		var edge: float  = maxf(absf(v.x), absf(v.z))
-		var efade: float = clamp(1.0 - (edge - 170.0) / 28.0, 0.0, 1.0)
-		v.y = maxf(h * efade, 0.0)
-		mdt.set_vertex(i, v)
-
-	arr_mesh.clear_surfaces()
-	mdt.commit_to_surface(arr_mesh)
-
-	# Rebuild proper normals AND tangents so the normal-mapped shader works
-	var st := SurfaceTool.new()
-	st.create_from(arr_mesh, 0)
-	st.generate_normals()
-	st.generate_tangents()
-	ground_node.mesh = st.commit()
-
-	# Rebuild collision immediately from the bumped mesh so it's valid before
-	# the first physics tick. tool_manager awaits 2 frames before rebuilding,
-	# but _physics_process() fires in frame 1 — without this, roamers fall
-	# through the empty ConcavePolygonShape3D that the scene starts with.
-	var static_body := ground_node.get_node_or_null("StaticBody3D")
-	if static_body:
-		var col := static_body.get_node_or_null("CollisionShape3D") as CollisionShape3D
-		if col:
-			col.shape = ground_node.mesh.create_trimesh_shape()
-	
 
 ## ── Outer world decoration ────────────────────────────────────────────────────
 
