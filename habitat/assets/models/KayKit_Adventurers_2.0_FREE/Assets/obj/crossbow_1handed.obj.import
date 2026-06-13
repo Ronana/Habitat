@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://b1xl2aofcf07l"
+path="res://.godot/imported/crossbow_1handed.obj-f410b569d7d000644b2a4f6e4d5409ba.mesh"
+
+[deps]
+
+files=["res://.godot/imported/crossbow_1handed.obj-f410b569d7d000644b2a4f6e4d5409ba.mesh"]
+
+source_file="res://assets/models/KayKit_Adventurers_2.0_FREE/Assets/obj/crossbow_1handed.obj"
+dest_files=["res://.godot/imported/crossbow_1handed.obj-f410b569d7d000644b2a4f6e4d5409ba.mesh", "res://.godot/imported/crossbow_1handed.obj-f410b569d7d000644b2a4f6e4d5409ba.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

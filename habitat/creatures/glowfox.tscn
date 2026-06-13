@@ -1,128 +1,41 @@
 [gd_scene format=3 uid="uid://c017yserk35hg"]
 
-[ext_resource type="Script" path="res://scripts/glowfox.gd" id="1_13udl"]
-
-[sub_resource type="StandardMaterial3D" id="Mat_orange"]
-albedo_color = Color(0.82, 0.42, 0.12, 1)
-roughness = 0.72
-emission_enabled = true
-emission = Color(0.9, 0.44, 0.06, 1)
-emission_energy_multiplier = 0.5
-
-[sub_resource type="SphereMesh" id="Mesh_body"]
-material = SubResource("Mat_orange")
-radius = 0.28
-height = 0.52
-
-[sub_resource type="StandardMaterial3D" id="Mat_cream"]
-albedo_color = Color(0.94, 0.82, 0.6, 1)
-roughness = 0.8
-emission_enabled = true
-emission = Color(0.94, 0.82, 0.55, 1)
-emission_energy_multiplier = 0.22
-
-[sub_resource type="SphereMesh" id="Mesh_belly"]
-material = SubResource("Mat_cream")
-radius = 0.18
-height = 0.3
-
-[sub_resource type="SphereMesh" id="Mesh_head"]
-material = SubResource("Mat_orange")
-radius = 0.22
-height = 0.38
-
-[sub_resource type="SphereMesh" id="Mesh_face"]
-material = SubResource("Mat_cream")
-radius = 0.15
-height = 0.24
-
-[sub_resource type="CylinderMesh" id="Mesh_ear"]
-material = SubResource("Mat_orange")
-top_radius = 0.02
-bottom_radius = 0.09
-height = 0.22
-
-[sub_resource type="SphereMesh" id="Mesh_snout"]
-material = SubResource("Mat_cream")
-radius = 0.09
-height = 0.14
-
-[sub_resource type="StandardMaterial3D" id="Mat_dark"]
-albedo_color = Color(0.22, 0.1, 0.04, 1)
-roughness = 0.9
-
-[sub_resource type="SphereMesh" id="Mesh_nose"]
-material = SubResource("Mat_dark")
-radius = 0.04
-height = 0.06
-
-[sub_resource type="SphereMesh" id="Mesh_tail"]
-material = SubResource("Mat_orange")
-radius = 0.2
-height = 0.36
-
-[sub_resource type="StandardMaterial3D" id="Mat_tail_tip"]
-albedo_color = Color(0.95, 0.9, 0.76, 1)
-roughness = 0.78
-emission_enabled = true
-emission = Color(0.9, 0.86, 0.68, 1)
-emission_energy_multiplier = 0.3
-
-[sub_resource type="SphereMesh" id="Mesh_tail_tip"]
-material = SubResource("Mat_tail_tip")
-radius = 0.13
-height = 0.2
+[ext_resource type="Script" uid="uid://3hpehwvc7ssa" path="res://scripts/glowfox.gd" id="1_13udl"]
+[ext_resource type="PackedScene" uid="uid://cjru85ilai3pd" path="res://assets/models/exported/GlowFox.glb" id="2_p0r7e"]
+[ext_resource type="Shader" uid="uid://coningduy756y" path="res://shaders/fox_body.gdshader" id="3_u7ie2"]
+[ext_resource type="Shader" uid="uid://b8uud00jlxiyq" path="res://shaders/fox_tail.gdshader" id="4_fwr4p"]
 
 [sub_resource type="CapsuleShape3D" id="Col"]
 radius = 0.28
 height = 0.85
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_22tqb"]
+render_priority = 0
+shader = ExtResource("3_u7ie2")
+shader_parameter/base_colour = Color(0.118, 0.067, 0.22, 1)
+shader_parameter/sheen_colour = Color(0.278, 0.196, 0.557, 1)
+shader_parameter/sheen_strength = 0.35
+shader_parameter/roughness = 0.65
+shader_parameter/specular = 0.3
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_t0yoc"]
+render_priority = 0
+shader = ExtResource("4_fwr4p")
+shader_parameter/colour_tip = Color(0.98, 0.502, 0.118, 1)
+shader_parameter/colour_mid = Color(0.867, 0.333, 0.6, 1)
+shader_parameter/colour_base = Color(0.149, 0.071, 0.278, 1)
+shader_parameter/reflection_blend = 0.45
+shader_parameter/emission_strength = 2.5
+shader_parameter/uv_axis = 1
+
 [node name="GlowFox" type="CharacterBody3D" unique_id=1061477021 groups=["roamers"]]
 floor_max_angle = 1.5707964
 floor_snap_length = 0.5
 script = ExtResource("1_13udl")
+walk_anim_name = "Walk"
+idle_anim_name = "Survey"
 species_id = "GlowFox"
 creature_scene_path = "res://creatures/glowfox.tscn"
-
-[node name="Body" type="MeshInstance3D" parent="." unique_id=194262298]
-transform = Transform3D(1, 0, 0, 0, 0.8, 0, 0, 0, 1.3, 0, 0.36, 0)
-mesh = SubResource("Mesh_body")
-
-[node name="Belly" type="MeshInstance3D" parent="." unique_id=1166802184]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, -0.16)
-mesh = SubResource("Mesh_belly")
-
-[node name="Head" type="MeshInstance3D" parent="." unique_id=1481357624]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.58, -0.38)
-mesh = SubResource("Mesh_head")
-
-[node name="FacePatch" type="MeshInstance3D" parent="." unique_id=591961785]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 0.42, 0, 0.5, -0.55)
-mesh = SubResource("Mesh_face")
-
-[node name="EarL" type="MeshInstance3D" parent="." unique_id=1007699841]
-transform = Transform3D(0.9007792, -0.43485385, 0, 0.43485385, 0.9007792, 0, 0, 0, 1, -0.13, 0.78, -0.34)
-mesh = SubResource("Mesh_ear")
-
-[node name="EarR" type="MeshInstance3D" parent="." unique_id=1874864107]
-transform = Transform3D(0.9395329, 0.34318936, 0, -0.34318936, 0.9395329, 0, 0, 0, 1, 0.13, 0.78, -0.34)
-mesh = SubResource("Mesh_ear")
-
-[node name="Snout" type="MeshInstance3D" parent="." unique_id=1879716194]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.47, -0.57)
-mesh = SubResource("Mesh_snout")
-
-[node name="Nose" type="MeshInstance3D" parent="." unique_id=42819128]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.46, -0.65)
-mesh = SubResource("Mesh_nose")
-
-[node name="Tail" type="MeshInstance3D" parent="." unique_id=405272817]
-transform = Transform3D(0.85, 0, 0, 0, 1.222, 0.445, 0, -0.342, 0.94, 0, 0.52, 0.42)
-mesh = SubResource("Mesh_tail")
-
-[node name="TailTip" type="MeshInstance3D" parent="." unique_id=1932405941]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0.52)
-mesh = SubResource("Mesh_tail_tip")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1879991068]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
@@ -133,3 +46,52 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
 billboard = 1
 no_depth_test = true
 text = "GlowFox"
+
+[node name="FoxModel" parent="." unique_id=1299246516 instance=ExtResource("2_p0r7e")]
+transform = Transform3D(-0.008, 0, -6.993822e-10, 0, 0.008, 0, 6.993822e-10, 0, -0.008, 0, 0, 0)
+
+[node name="Skeleton3D" parent="FoxModel/root" parent_id_path=PackedInt32Array(1299246516, 1718836157) index="0" unique_id=1769748441]
+bones/2/position = Vector3(0.00017332111, 2302.334, 3377.108)
+bones/2/rotation = Quaternion(0.17221989, -0.6858137, -0.1722191, 0.6858137)
+bones/3/position = Vector3(1285.0597, -0.3069664, -3.650421e-05)
+bones/3/rotation = Quaternion(-4.752988e-07, -5.0431584e-07, -0.5618388, 0.8272467)
+bones/4/position = Vector3(2165.5754, -0.1407411, -0.0021892358)
+bones/4/rotation = Quaternion(8.0799765e-08, 4.3761545e-08, 0.25464112, 0.9670357)
+bones/5/position = Vector3(2564.9148, -0.013234637, -0.0024975026)
+bones/5/rotation = Quaternion(1.7905585e-07, 2.2355209e-07, -0.09433167, 0.9955409)
+bones/6/position = Vector3(1337.696, -0.17301841, -0.0009221229)
+bones/6/rotation = Quaternion(-3.934071e-07, -1.0600117e-07, -0.18501002, 0.9827367)
+bones/7/rotation = Quaternion(-0.0037592805, -0.0050381236, -0.8471845, 0.53126174)
+bones/8/position = Vector3(2304.5122, 0.19728412, 0.017184136)
+bones/8/rotation = Quaternion(-1.3511502e-06, -1.7834235e-06, 0.65682304, 0.7540448)
+bones/9/position = Vector3(1935.0068, -14.366187, 0.0067673265)
+bones/9/rotation = Quaternion(-0.009958076, 0.008530156, -0.38392743, 0.92327017)
+bones/10/rotation = Quaternion(-0.083997376, 0.011826183, -0.9917826, 0.095770255)
+bones/11/position = Vector3(2304.5132, -0.32478225, 0.2537161)
+bones/11/rotation = Quaternion(-9.5828955e-06, 7.674593e-06, 0.7120722, 0.7021063)
+bones/12/position = Vector3(1935.0034, -14.804957, 0.21015544)
+bones/12/rotation = Quaternion(0.088888764, 0.030062877, -0.66509485, 0.7408399)
+bones/13/position = Vector3(426.41638, 1595.775, -2.0589308e-05)
+bones/13/rotation = Quaternion(-2.9409603e-07, 2.829452e-07, 0.9832446, 0.18229166)
+bones/14/position = Vector3(1241.1915, -0.25703666, 0.00046578704)
+bones/14/rotation = Quaternion(2.0837744e-08, 4.8194284e-08, -0.24955001, 0.968362)
+bones/15/position = Vector3(2424.0342, -0.12793453, 0.0011216312)
+bones/15/rotation = Quaternion(2.2275046e-08, 2.54525e-08, -0.20914082, 0.97788554)
+bones/16/rotation = Quaternion(-0.044602413, -0.08262804, 0.8639687, -0.49471352)
+bones/17/position = Vector3(1894.4172, 0.13568895, -0.10029123)
+bones/17/rotation = Quaternion(-2.9509112e-05, 2.316137e-05, -0.6434973, 0.7654485)
+bones/18/position = Vector3(1794.28, 0.19416855, 0.043852556)
+bones/18/rotation = Quaternion(-0.027541365, -0.11621792, 0.67326826, 0.7296882)
+bones/19/position = Vector3(1577.9943, 0.0030005013, 0.0014283616)
+bones/20/rotation = Quaternion(0.037053406, 0.07560334, 0.6928807, -0.7161199)
+bones/21/position = Vector3(1894.4185, 0.05219165, -0.00093758834)
+bones/21/rotation = Quaternion(2.5081347e-08, -2.652531e-08, -0.5471581, 0.83702934)
+bones/22/position = Vector3(1794.2798, -0.18545131, 0.00039898214)
+bones/22/rotation = Quaternion(0.06526121, 0.15510057, 0.53999317, 0.824677)
+bones/23/position = Vector3(1577.9929, 0.049497623, -0.099614)
+
+[node name="fox" parent="FoxModel/root/Skeleton3D" index="0" unique_id=1330037530]
+surface_material_override/0 = SubResource("ShaderMaterial_22tqb")
+surface_material_override/1 = SubResource("ShaderMaterial_t0yoc")
+
+[editable path="FoxModel"]

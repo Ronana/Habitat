@@ -4,7 +4,7 @@ signal time_changed(hour)
 
 # 24 minute real day = 1 game day (adjustable)
 var day_length_seconds: float = 240.0
-var current_time: float = 8.0 # Start at 8am
+var current_time: float = 22.0 # Start at 10pm — deep night
 var is_paused: bool = false
 
 # References set by garden

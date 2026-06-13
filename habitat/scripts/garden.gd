@@ -53,7 +53,6 @@ var species_requirements: Dictionary = {
 }
 
 func _ready():
-	# In the editor: just draw the boundary so the scene view shows it.
 	if Engine.is_editor_hint():
 		create_boundary()
 		return
@@ -72,6 +71,17 @@ func _ready():
 	_scatter_outer_decorations()
 	plant_starting_bushes()
 	give_starting_inventory()
+	# Terrain3D shadow fix — ensure it's on all render/light layers so every
+	# light in the scene (including editor-added MoonLight) can hit it.
+	var t3d := get_node_or_null("Terrain3D")
+	if t3d:
+		t3d.set("layers", 0xFFFFF)
+		t3d.set("cast_shadow", GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+	# Also force all scene lights to affect all layers
+	for child in get_children():
+		if child is Light3D:
+			child.light_cull_mask = 0xFFFFF
+
 	# Connect day night manager to scene lights
 	var sun = get_node("DirectionalLight3D")
 	var env = get_node("WorldEnvironment").environment
@@ -186,46 +196,64 @@ func scatter_trees() -> void:
 
 
 func create_boundary():
-	# In the editor use tall bright orange posts so the boundary is clearly visible.
-	# At runtime use the low decorative strip.
 	var is_editor := Engine.is_editor_hint()
 
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# Runtime: flat rune-glyph strips that glow orange on the ground.
+	# Editor: tall bright orange posts so the boundary is clearly visible in the viewport.
+	var half  := starter_area_size / 2.0
+	var seg   := 2.0
+	var count := int(starter_area_size / seg)
+
 	if is_editor:
-		mat.albedo_color = Color(1.0, 0.55, 0.05, 1.0)   # bright orange
+		# Simple tall orange posts for editor visibility
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(1.0, 0.55, 0.05, 1.0)
+		for i in range(count):
+			var along: float = -half + (float(i) + 0.5) * seg
+			_add_boundary_segment(Vector3(along, 0.75, -half), Vector3(seg, 1.5, 0.15), mat, "x", true)
+			_add_boundary_segment(Vector3(along, 0.75,  half), Vector3(seg, 1.5, 0.15), mat, "x", true)
+			_add_boundary_segment(Vector3(-half, 0.75, along), Vector3(0.15, 1.5, seg), mat, "z", true)
+			_add_boundary_segment(Vector3( half, 0.75, along), Vector3(0.15, 1.5, seg), mat, "z", true)
 	else:
-		mat.albedo_color = Color(0.78, 0.88, 0.62, 1.0)
-	mat.roughness = 1.0
+		# Load the rune shader once and share it across all strip segments
+		var rune_shader := load("res://shaders/boundary_rune.gdshader") as Shader
+		var rune_mat := ShaderMaterial.new()
+		rune_mat.shader = rune_shader
+		# Strip is 0.9 m wide — same size for every segment so UVs tile consistently
+		var strip_w := 0.9
+		for i in range(count):
+			var along: float = -half + (float(i) + 0.5) * seg
+			# All segments use Vector2(seg, strip_w); Z-axis segments are rotated 90° in _add_boundary_segment
+			_add_boundary_segment(Vector3(along, 0.02, -half), Vector3(seg, strip_w, 0.0), rune_mat, "x", false)
+			_add_boundary_segment(Vector3(along, 0.02,  half), Vector3(seg, strip_w, 0.0), rune_mat, "x", false)
+			_add_boundary_segment(Vector3(-half, 0.02, along), Vector3(seg, strip_w, 0.0), rune_mat, "z", false)
+			_add_boundary_segment(Vector3( half, 0.02, along), Vector3(seg, strip_w, 0.0), rune_mat, "z", false)
 
-	var half      := starter_area_size / 2.0
-	var seg       := 2.0
-	var thickness := 0.12 if not is_editor else 0.20
-	var height    := 0.06 if not is_editor else 1.50   # tall in editor so it's visible
-	var count     := int(starter_area_size / seg)
-
-	for i in range(count):
-		var along: float = -half + (float(i) + 0.5) * seg
-		_add_boundary_segment(Vector3(along, 0.0, -half), Vector3(seg, height, thickness), mat, "x")
-		_add_boundary_segment(Vector3(along, 0.0,  half), Vector3(seg, height, thickness), mat, "x")
-		_add_boundary_segment(Vector3(-half, 0.0, along), Vector3(thickness, height, seg), mat, "z")
-		_add_boundary_segment(Vector3( half, 0.0, along), Vector3(thickness, height, seg), mat, "z")
-
-func _add_boundary_segment(pos: Vector3, size: Vector3, mat: StandardMaterial3D, run_axis: String) -> void:
+func _add_boundary_segment(pos: Vector3, size: Vector3, mat: Material, run_axis: String, use_box: bool) -> void:
 	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size     = size
-	mi.mesh     = bm
+	if use_box:
+		var bm  := BoxMesh.new()
+		bm.size  = size
+		mi.mesh  = bm
+	else:
+		# Flat PlaneMesh — UV.x always runs along the long axis (strip length).
+		# Z-axis segments are rotated 90° around Y so their long axis aligns with Z
+		# and the rune shader tiles correctly along the strip.
+		var pm  := PlaneMesh.new()
+		pm.size  = Vector2(size.x, size.y)
+		mi.mesh  = pm
+		if run_axis == "z":
+			mi.rotation_degrees.y = 90.0
 	mi.position = pos
 	mi.set_meta("run_axis", run_axis)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.set_surface_override_material(0, mat)
 	mi.add_to_group("boundary_lines")
 	add_child(mi)
-	# Owner must be set for the node to appear in the editor scene tree
 	if Engine.is_editor_hint() and get_tree():
 		mi.owner = get_tree().edited_scene_root
 
-## ── Sky shader setup ──────────────────────────────────────────────────────────
 func _setup_sky(env: Environment) -> void:
 	var sky_shader := load("res://GodotSkiesShaders/main.gdshader") as Shader
 	if sky_shader == null:
@@ -630,7 +658,6 @@ func _process(delta):
 
 func update_boundary_heights():
 	var space_state = get_world_3d().direct_space_state
-	var seg := 2.0
 	for node in get_tree().get_nodes_in_group("boundary_lines"):
 		var marker := node as Node3D
 		if not marker:
@@ -638,35 +665,14 @@ func update_boundary_heights():
 		var cx: float = marker.position.x
 		var cz: float = marker.position.z
 
-		# Centre raycast — sets the Y position
 		var c_query := PhysicsRayQueryParameters3D.create(
 			Vector3(cx, 10.0, cz), Vector3(cx, -5.0, cz))
 		var c_result := space_state.intersect_ray(c_query)
 		if not c_result:
 			continue
-		marker.position.y = c_result.position.y
-
-		# Side raycasts along the segment's run axis to compute tilt angle
-		var run_axis: String = marker.get_meta("run_axis") if marker.has_meta("run_axis") else "x"
-		var half := seg * 0.5
-		var p1 := Vector3(cx - (half if run_axis == "x" else 0.0), 10.0,
-						  cz - (half if run_axis == "z" else 0.0))
-		var p2 := Vector3(cx + (half if run_axis == "x" else 0.0), 10.0,
-						  cz + (half if run_axis == "z" else 0.0))
-		var r1 := space_state.intersect_ray(
-			PhysicsRayQueryParameters3D.create(p1, p1 + Vector3(0, -15.0, 0)))
-		var r2 := space_state.intersect_ray(
-			PhysicsRayQueryParameters3D.create(p2, p2 + Vector3(0, -15.0, 0)))
-
-		if r1 and r2:
-			var slope: float = (float(r2.position.y) - float(r1.position.y)) / seg
-			var angle: float = atan(slope)
-			if run_axis == "x":
-				marker.rotation.z = -angle
-				marker.rotation.x = 0.0
-			else:
-				marker.rotation.x = angle
-				marker.rotation.z = 0.0
+		# Flat rune strips — only update Y, no tilt.
+		# Tilting flat planes causes clipping artifacts with the terrain surface.
+		marker.position.y = c_result.position.y + 0.02
 
 # ---------------------------------------------------------------------------
 # Wild roamer attraction

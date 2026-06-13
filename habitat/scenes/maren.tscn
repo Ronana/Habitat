@@ -1,122 +1,8 @@
 [gd_scene format=3 uid="uid://bqrg6quaigfo4"]
 
 [ext_resource type="Script" uid="uid://comabbgqs7ss6" path="res://scripts/maren.gd" id="1_edqfg"]
-
-[sub_resource type="StandardMaterial3D" id="RobeMat"]
-albedo_color = Color(0.13, 0.29, 0.15, 1)
-roughness = 0.88
-
-[sub_resource type="CylinderMesh" id="RobeMesh"]
-material = SubResource("RobeMat")
-top_radius = 0.23
-bottom_radius = 0.44
-height = 1.08
-
-[sub_resource type="StandardMaterial3D" id="RobeHemMat"]
-albedo_color = Color(0.09, 0.21, 0.11, 1)
-roughness = 0.9
-
-[sub_resource type="CylinderMesh" id="RobeHemMesh"]
-material = SubResource("RobeHemMat")
-top_radius = 0.44
-bottom_radius = 0.51
-height = 0.1
-
-[sub_resource type="StandardMaterial3D" id="BeltMat"]
-albedo_color = Color(0.22, 0.12, 0.06, 1)
-roughness = 0.92
-
-[sub_resource type="CylinderMesh" id="BeltMesh"]
-material = SubResource("BeltMat")
-top_radius = 0.262
-bottom_radius = 0.262
-height = 0.09
-
-[sub_resource type="StandardMaterial3D" id="PouchMat"]
-albedo_color = Color(0.38, 0.24, 0.12, 1)
-roughness = 0.9
-
-[sub_resource type="BoxMesh" id="PouchMesh"]
-material = SubResource("PouchMat")
-size = Vector3(0.15, 0.21, 0.11)
-
-[sub_resource type="StandardMaterial3D" id="CollarMat"]
-albedo_color = Color(0.91, 0.86, 0.76, 1)
-roughness = 0.84
-
-[sub_resource type="CylinderMesh" id="CollarMesh"]
-material = SubResource("CollarMat")
-top_radius = 0.16
-bottom_radius = 0.21
-height = 0.28
-
-[sub_resource type="StandardMaterial3D" id="SkinMat"]
-albedo_color = Color(0.89, 0.71, 0.57, 1)
-roughness = 0.7
-
-[sub_resource type="CapsuleMesh" id="ArmMesh"]
-material = SubResource("SkinMat")
-radius = 0.074
-height = 0.46
-
-[sub_resource type="SphereMesh" id="HandMesh"]
-material = SubResource("SkinMat")
-radius = 0.082
-
-[sub_resource type="StandardMaterial3D" id="StaffMat"]
-albedo_color = Color(0.38, 0.26, 0.14, 1)
-roughness = 0.93
-
-[sub_resource type="CylinderMesh" id="StaffMesh"]
-material = SubResource("StaffMat")
-top_radius = 0.02
-bottom_radius = 0.028
-height = 1.42
-
-[sub_resource type="StandardMaterial3D" id="CrystalMat"]
-albedo_color = Color(0.42, 0.9, 0.84, 1)
-roughness = 0.2
-emission_enabled = true
-emission = Color(0.28, 0.78, 0.72, 1)
-emission_energy_multiplier = 1.4
-
-[sub_resource type="SphereMesh" id="CrystalMesh"]
-material = SubResource("CrystalMat")
-radius = 0.072
-
-[sub_resource type="CylinderMesh" id="NeckMesh"]
-material = SubResource("SkinMat")
-top_radius = 0.095
-bottom_radius = 0.105
-height = 0.18
-
-[sub_resource type="SphereMesh" id="HeadMesh"]
-material = SubResource("SkinMat")
-radius = 0.255
-
-[sub_resource type="StandardMaterial3D" id="HairMat"]
-albedo_color = Color(0.34, 0.15, 0.07, 1)
-roughness = 0.78
-
-[sub_resource type="SphereMesh" id="HairMesh"]
-material = SubResource("HairMat")
-radius = 0.275
-
-[sub_resource type="SphereMesh" id="HairBunMesh"]
-material = SubResource("HairMat")
-radius = 0.095
-
-[sub_resource type="StandardMaterial3D" id="EyeMat"]
-albedo_color = Color(0.08, 0.05, 0.04, 1)
-roughness = 0.55
-
-[sub_resource type="SphereMesh" id="EyeMesh"]
-material = SubResource("EyeMat")
-radius = 0.034
-
-[sub_resource type="SphereMesh" id="NoseMesh"]
-material = SubResource("SkinMat")
-radius = 0.028
+[ext_resource type="PackedScene" uid="uid://byva1rdeibp4j" path="res://assets/models/maren/maren_new.tscn" id="2_k3khq"]
+[ext_resource type="PackedScene" uid="uid://bmg2byls8k6o3" path="res://assets/models/KayKit_Adventurers_2.0_FREE/Assets/gltf/spellbook_open.gltf" id="3_rcvok"]
 
 [sub_resource type="SphereShape3D" id="InteractShape"]
 radius = 2.5
@@ -128,93 +14,12 @@ height = 1.4
 [node name="Maren" type="Node3D" unique_id=800751522]
 script = ExtResource("1_edqfg")
 
-[node name="Robe" type="MeshInstance3D" parent="." unique_id=1332585168]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.58, 0)
-mesh = SubResource("RobeMesh")
-
-[node name="RobeHem" type="MeshInstance3D" parent="." unique_id=1135097513]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
-mesh = SubResource("RobeHemMesh")
-
-[node name="Belt" type="MeshInstance3D" parent="." unique_id=1969358204]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.12, 0)
-mesh = SubResource("BeltMesh")
-
-[node name="SeedPouch" type="MeshInstance3D" parent="." unique_id=274355024]
-transform = Transform3D(0.9370872, 0, 0.34909546, 0, 1, 0, -0.34909546, 0, 0.9370872, 0.18584378, 0.86775875, 0.24023052)
-mesh = SubResource("PouchMesh")
-
-[node name="Collar" type="MeshInstance3D" parent="." unique_id=167388859]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.23, 0)
-mesh = SubResource("CollarMesh")
-
-[node name="LeftArm" type="MeshInstance3D" parent="." unique_id=1096705971]
-transform = Transform3D(0.84799194, 0.53054076, 0, -0.53054076, 0.84799194, 0, 0, 0, 1, -0.30618364, 1.1733601, 0)
-mesh = SubResource("ArmMesh")
-
-[node name="RightArm" type="MeshInstance3D" parent="." unique_id=529627778]
-transform = Transform3D(0.8659036, -0.50077426, 0, 0.50077426, 0.8659036, 0, 0, 0, 1, 0.31340507, 1.1602551, 0)
-mesh = SubResource("ArmMesh")
-
-[node name="LeftHand" type="MeshInstance3D" parent="." unique_id=1991349098]
-transform = Transform3D(0.9780058, 0.093859844, 0, -0.20857744, 0.4401026, 0, 0, 0, 1, -0.44321203, 0.8635522, 0)
-mesh = SubResource("HandMesh")
-
-[node name="RightHand" type="MeshInstance3D" parent="." unique_id=1596606013]
-transform = Transform3D(0.9531057, 0.03074726, -0.20431304, 0.17449033, 0.30234942, 0.49882534, 0.24727088, -0.33187258, 0.435521, 0.42612606, 0.86533564, 0.125236)
-mesh = SubResource("HandMesh")
-
-[node name="Staff" type="MeshInstance3D" parent="." unique_id=201230377]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.38389382, 0.71, 0.2686032)
-mesh = SubResource("StaffMesh")
-
-[node name="StaffCrystal" type="MeshInstance3D" parent="." unique_id=1229498789]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.38389382, 1.44, 0.2686032)
-mesh = SubResource("CrystalMesh")
-
-[node name="CrystalGlow" type="OmniLight3D" parent="." unique_id=1565185860]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.48, 1.44, 0.1)
-light_color = Color(0.4, 1, 0.92, 1)
-light_energy = 1.2
-omni_range = 2.2
-
-[node name="Head" type="Node3D" parent="." unique_id=1720531250]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5405917, 0)
-
-[node name="Neck" type="MeshInstance3D" parent="Head" unique_id=1095870845]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.09, 0)
-mesh = SubResource("NeckMesh")
-
-[node name="Skull" type="MeshInstance3D" parent="Head" unique_id=1563208432]
-transform = Transform3D(1, 0, 0, 0, 0.7655919, 0, 0, 0, 1, 0, 0.20667744, 0)
-mesh = SubResource("HeadMesh")
-
-[node name="Hair" type="MeshInstance3D" parent="Head" unique_id=1910233804]
-transform = Transform3D(1, 0, 0, 0, 0.82, 0, 0, 0, 1.06, 0, 0.3541695, -0.04)
-mesh = SubResource("HairMesh")
-
-[node name="HairBun" type="MeshInstance3D" parent="Head" unique_id=482634514]
-transform = Transform3D(1, 0, 0, 0, 0.98570347, -0.16848938, 0, 0.16848938, 0.98570347, 0, -0.23333168, -0.35319263)
-mesh = SubResource("HairBunMesh")
-
-[node name="EyeLeft" type="MeshInstance3D" parent="Head" unique_id=1459699941]
-transform = Transform3D(1, 0, 0, 0, 0.1, 0, 0, 0, 1, -0.1, 0.24000001, 0.23)
-mesh = SubResource("EyeMesh")
-
-[node name="EyeRight" type="MeshInstance3D" parent="Head" unique_id=449666130]
-transform = Transform3D(1, 0, 0, 0, 0.1, 0, 0, 0, 1, 0.1, 0.24, 0.23)
-mesh = SubResource("EyeMesh")
-
-[node name="Nose" type="MeshInstance3D" parent="Head" unique_id=1210329616]
-transform = Transform3D(1, 0, 0, 0, 0.1, 0, 0, 0, 1, 0, 0.14, 0.26)
-mesh = SubResource("NoseMesh")
-
 [node name="NameLabel" type="Label3D" parent="." unique_id=2112141687]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.52, 0)
 billboard = 1
 no_depth_test = true
 modulate = Color(0.95, 0.9, 0.78, 1)
-text = "Maren the Seedkeeper"
+text = "Sam the Seedkeeper"
 font_size = 28
 outline_size = 6
 
@@ -228,3 +33,8 @@ shape = SubResource("InteractShape")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=384826177]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
 shape = SubResource("BodyShape")
+
+[node name="Mage" parent="." unique_id=1321583683 instance=ExtResource("2_k3khq")]
+
+[node name="spellbook_open2" parent="." unique_id=1640497041 instance=ExtResource("3_rcvok")]
+transform = Transform3D(-0.99939084, -0.025315166, 0.024023196, 0, 0.68835455, 0.72537434, -0.03489945, 0.7249325, -0.68793523, 0.02028767, 0.8447544, 0.6398249)

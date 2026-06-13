@@ -925,21 +925,27 @@ func check_stage_progress():
 				ParticleManager.spawn_bond_sparkle(global_position)
 				ParticleManager.attach_dewdrop_aura(self)
 
+func _get_selectable_mesh() -> MeshInstance3D:
+	return get_node_or_null("Body") as MeshInstance3D
+
 func on_selected():
-	var body = get_node("Body")
-	var unique_mat = body.get_active_material(0).duplicate()
-	unique_mat.emission_enabled = true
-	unique_mat.emission = Color(1.0, 0.6, 0.1)
-	unique_mat.emission_energy_multiplier = 2.0
-	body.set_surface_override_material(0, unique_mat)
+	var body := _get_selectable_mesh()
+	if body:
+		var base_mat = body.get_active_material(0)
+		if base_mat:
+			var unique_mat = base_mat.duplicate()
+			unique_mat.emission_enabled = true
+			unique_mat.emission = Color(1.0, 0.6, 0.1)
+			unique_mat.emission_energy_multiplier = 2.0
+			body.set_surface_override_material(0, unique_mat)
 	if selection_ring:
 		selection_ring.visible = true
 		_ring_pulse_timer = 0.0
 
 func on_deselected():
-	var body = get_node("Body")
-	# Restore glow mat if bonded, otherwise clear override
-	body.set_surface_override_material(0, _glow_mat)
+	var body := _get_selectable_mesh()
+	if body:
+		body.set_surface_override_material(0, _glow_mat)
 	if selection_ring:
 		selection_ring.visible = false
 

@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://byva1rdeibp4j"]
+
+[ext_resource type="PackedScene" uid="uid://n4j7dlj7tu8m" path="res://assets/models/KayKit_Adventurers_2.0_FREE/Characters/gltf/Mage.glb" id="1_dv587"]
+
+[sub_resource type="TorusMesh" id="TorusMesh_dv587"]
+
+[node name="Mage" unique_id=1321583683 instance=ExtResource("1_dv587")]
+
+[node name="Skeleton3D" parent="Rig_Medium" parent_id_path=PackedInt32Array(77094572) index="0" unique_id=238967558]
+bones/8/rotation = Quaternion(-0.514121, -0.485468, -0.830468, 0.259122)
+bones/9/rotation = Quaternion(0, 0, -0.620286, 1.463471)
+bones/14/rotation = Quaternion(-0.514121, 0.485468, 1, 0.514122)
+bones/15/rotation = Quaternion(0, 0, 0.615286, 0.998471)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." index="1" unique_id=736995075]
+transform = Transform3D(0.0111319, 0.022384835, 0, -0.022384835, 0.0111319, 0, 0, 0, 0.025, 0.04428856, 1.4982244, 0.49382603)
+mesh = SubResource("TorusMesh_dv587")

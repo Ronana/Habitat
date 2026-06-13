@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://df85i2112wp4m"]
+
+[ext_resource type="PackedScene" uid="uid://badb5btydxf0y" path="res://Stylized Nature MegaKit[Standard]/glTF/Mushroom_Common.gltf" id="1_tlsfj"]
+[ext_resource type="ArrayMesh" uid="uid://kc0l03hdpxii" path="res://textures/new_array_mesh.tres" id="2_vwtv5"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kuyet"]
+emission_enabled = true
+emission = Color(1, 0.72156864, 0.6039216, 1)
+emission_energy_multiplier = 2.0
+
+[node name="Mushroom_Common2" unique_id=1827250023 instance=ExtResource("1_tlsfj")]
+
+[node name="Mushroom_Common" parent="." index="0" unique_id=167219127]
+material_overlay = SubResource("StandardMaterial3D_kuyet")
+mesh = ExtResource("2_vwtv5")
