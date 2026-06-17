@@ -1,6 +1,6 @@
 extends CharacterBody3D
 
-enum State { WANDERING, IDLE, FLEEING, BREEDING, SLEEPING, SLEEP_WALKING }
+enum State { WANDERING, IDLE, FLEEING, BREEDING, SLEEPING, SLEEP_WALKING, AGITATED }
 enum AttractionStage { APPEARS, VISITS, RESIDENT, BONDED }
 enum BreedPhase { NONE, APPROACHING, GOING_TO_SHELTER, INSIDE, EXITING }
 
@@ -10,6 +10,20 @@ enum BreedPhase { NONE, APPROACHING, GOING_TO_SHELTER, INSIDE, EXITING }
 var roamer_uid: String = ""
 
 var state = State.WANDERING
+
+# ── Species conflict ──────────────────────────────────────────────────────────
+const CONFLICTS: Dictionary = {
+	"Mossdeer": ["Stoneback"],
+	"GlowFox":  ["Stoneback"],
+}
+var _agitation_timer: float = 0.0
+const AGITATION_CONTACT_TIME: float = 5.0   # seconds before happiness drain
+const AGITATION_DRAIN: float = 0.2           # happiness lost per conflict
+const AGITATION_COOLDOWN: float = 12.0       # seconds before re-agitation possible
+var _agitation_cooldown: float = 0.0
+var _conflict_partner: Node3D = null
+var _eye_flash_timer: float = 0.0
+var _eye_flashing: bool = false
 var attraction_stage = AttractionStage.APPEARS
 var wander_target: Vector3
 var wander_timer: float = 0.0
@@ -60,6 +74,9 @@ var need_decay = {
 
 var happiness: float = 1.0
 
+# Selection glow colour — set per-species in _ready()
+var _selection_color: Color = Color(1.0, 0.70, 0.15)
+
 # ── Naming ────────────────────────────────────────────────────────────────────
 var roamer_name: String = ""
 var _name_label_3d: Label3D = null
@@ -73,6 +90,10 @@ const NAME_POOL: Array = [
 
 # ── Traits ────────────────────────────────────────────────────────────────────
 var traits: Array = []
+
+# ── Interaction cooldowns ──────────────────────────────────────────────────────
+const INTERACT_COOLDOWN := { "pet": 60.0, "play": 90.0, "gift": 30.0 }
+var _interact_cd        := { "pet":  0.0, "play":  0.0, "gift":  0.0 }
 
 const TRAIT_POOL: Dictionary = {
 	"shy":       {"name": "Shy",       "icon": "😳", "desc": "Moves slowly, stays cautious",        "speed_mult": 0.85, "food_mult": 0.90, "safety_mult": 1.15, "dewdrop_mult": 1.0 },
@@ -119,6 +140,26 @@ var _need_check_timer: float = 0.0
 const NEED_CHECK_INTERVAL: float = 1.5
 const NEED_WARN_THRESHOLD: float = 0.3  # show icon below this value
 
+# Breeding heart indicator
+var _heart_label: Label3D = null
+var _heart_pulse_timer: float = 0.0
+const HEART_HAPPINESS_THRESHOLD: float = 0.85
+const POPULATION_CAP: int = 12
+
+# ── Burden / departure system ─────────────────────────────────────────────────
+enum BurdenState { HEALTHY, BURDENED, DEPARTING }
+var burden_state: int = BurdenState.HEALTHY
+var _critical_timer: float = 0.0    # cumulative seconds any need < CRITICAL_NEED_THRESHOLD
+var _burdened_timer: float = 0.0    # seconds spent in BURDENED
+var _cough_timer: float = 0.0       # countdown to next cough puff
+var _depart_target: Vector3 = Vector3.ZERO
+var _burden_aura: CPUParticles3D = null
+
+const CRITICAL_NEED_THRESHOLD: float = 0.15
+const BURDEN_TRIGGER_SECS: float = 45.0   # neglect this long → BURDENED
+const DEPART_TRIGGER_SECS: float = 30.0   # burdened this long → DEPARTING
+const COUGH_INTERVAL: float = 6.0
+
 func _ready():
 	floor_snap_length = 0.5
 	floor_max_angle = deg_to_rad(45)
@@ -150,8 +191,8 @@ func _create_selection_ring():
 	mat.transparency           = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.no_depth_test          = true
 	mat.emission_enabled       = true
-	mat.albedo_color           = Color(0.85, 0.95, 1.0, 0.55)
-	mat.emission               = Color(0.7, 0.88, 1.0)
+	mat.albedo_color           = Color(_selection_color.r, _selection_color.g, _selection_color.b, 0.55)
+	mat.emission               = _selection_color
 	mat.emission_energy_multiplier = 1.2
 	selection_ring.set_surface_override_material(0, mat)
 	selection_ring.visible = false
@@ -304,6 +345,14 @@ func _create_need_indicator():
 	_need_label.position = Vector3(0.0, 1.6, 0.0)
 	add_child(_need_label)
 
+	_heart_label = Label3D.new()
+	_heart_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_heart_label.no_depth_test = true
+	_heart_label.font_size = 32
+	_heart_label.visible = false
+	_heart_label.position = Vector3(0.0, 2.2, 0.0)
+	add_child(_heart_label)
+
 func _update_need_indicator():
 	if not _need_label:
 		return
@@ -336,7 +385,36 @@ func _update_need_indicator():
 		_need_label.modulate = col
 		_need_label.visible = true
 
+func _update_heart_indicator() -> void:
+	if not _heart_label:
+		return
+	# Never show while sleeping or already breeding
+	if _is_sleeping or is_breeding:
+		_heart_label.visible = false
+		return
+	# Must be bonded adult with a mate and high enough happiness
+	var breed_ready: bool = (
+		attraction_stage == AttractionStage.BONDED
+		and is_adult
+		and happiness >= HEART_HAPPINESS_THRESHOLD
+		and bond_target != null
+		and is_instance_valid(bond_target)
+	)
+	if not breed_ready:
+		_heart_label.visible = false
+		return
+	# Check population cap
+	var total_roamers: int = get_tree().get_nodes_in_group("roamers").size()
+	if total_roamers >= POPULATION_CAP:
+		_heart_label.text    = "💙"
+		_heart_label.modulate = Color(0.5, 0.7, 1.0, 0.9)
+	else:
+		_heart_label.text    = "❤"
+		_heart_label.modulate = Color(1.0, 0.45, 0.55, 1.0)
+	_heart_label.visible = true
+
 func _process(delta):
+	_tick_interaction_cooldowns(delta)
 	if selection_ring and selection_ring.visible:
 		_ring_pulse_timer += delta
 		var pulse = 1.0 + 0.05 * sin(_ring_pulse_timer * 3.2)
@@ -356,15 +434,27 @@ func _process(delta):
 			_sleep_z_timer = _sleep_z_interval + randf_range(-0.4, 0.4)
 			_spawn_sleep_z()
 
+	# Tick interaction cooldowns
+	for k in _interact_cd:
+		if _interact_cd[k] > 0.0:
+			_interact_cd[k] = max(0.0, _interact_cd[k] - delta)
+
 	# Needs indicator — check periodically, pulse when visible
 	_need_check_timer -= delta
 	if _need_check_timer <= 0.0:
 		_need_check_timer = NEED_CHECK_INTERVAL
 		_update_need_indicator()
+		_update_heart_indicator()
 	if _need_label and _need_label.visible:
 		_need_pulse_timer += delta
 		var pulse_y := 1.55 + 0.08 * sin(_need_pulse_timer * 4.0)
 		_need_label.position.y = pulse_y
+	# Heart pulse — gentle float + scale throb
+	if _heart_label and _heart_label.visible:
+		_heart_pulse_timer += delta
+		_heart_label.position.y = 2.2 + 0.07 * sin(_heart_pulse_timer * 2.8)
+		var s: float = 1.0 + 0.12 * absf(sin(_heart_pulse_timer * 2.8))
+		_heart_label.scale = Vector3(s, s, s)
 
 func _physics_process(delta):
 	_in_water = SplatMapManager.is_water_at(global_position)
@@ -405,6 +495,14 @@ func _physics_process(delta):
 		State.SLEEPING:
 			velocity.x = 0.0
 			velocity.z = 0.0
+		State.AGITATED:
+			_handle_agitated(delta)
+
+	# Conflict proximity scan
+	if _agitation_cooldown > 0.0:
+		_agitation_cooldown -= delta
+	if state != State.BREEDING and state != State.SLEEPING and state != State.SLEEP_WALKING:
+		_scan_for_conflicts()
 
 	# Earn Dewdrops when happy — bonded roamers earn significantly more
 	dewdrop_timer += delta
@@ -415,7 +513,8 @@ func _physics_process(delta):
 			AttractionStage.VISITS:   stage_multiplier = 1.5
 			AttractionStage.RESIDENT: stage_multiplier = 3.0
 			AttractionStage.BONDED:   stage_multiplier = 8.0
-		var earned = happiness * 2.0 * stage_multiplier * SeasonManager.get_dewdrop_multiplier()
+		var gus_mult: float = GusManager.dewdrop_income_mult() if attraction_stage == AttractionStage.BONDED else 1.0
+		var earned = happiness * 2.0 * stage_multiplier * SeasonManager.get_dewdrop_multiplier() * gus_mult
 		CurrencyManager.add_dewdrops(earned)
 
 	# Seek food when hungry (skip during breeding and sleep)
@@ -445,7 +544,6 @@ func _physics_process(delta):
 		if grow_up_timer >= grow_up_time:
 			is_adult = true
 			scale = Vector3.ONE
-			print(name, " has grown up!")
 
 	move_and_slide()
 
@@ -470,7 +568,6 @@ func start_bond(mate):
 	# Both walk toward each other
 	wander_target = mate.global_position
 	mate.wander_target = global_position
-	print(name, " and ", mate.name, " are heading toward each other!")
 
 func handle_breeding(delta):
 	# Both leader and follower: move toward their current wander_target
@@ -533,7 +630,6 @@ func _transition_to_shelter():
 	bond_target.breed_phase = BreedPhase.GOING_TO_SHELTER
 	wander_target = shelter.global_position
 	bond_target.wander_target = shelter.global_position
-	print(name, " and ", bond_target.name, " are heading to the shelter!")
 
 func _enter_shelter():
 	breed_phase = BreedPhase.INSIDE
@@ -543,7 +639,6 @@ func _enter_shelter():
 	bond_target.visible = false
 	velocity = Vector3.ZERO
 	bond_target.velocity = Vector3.ZERO
-	print(name, " and ", bond_target.name, " are inside the shelter!")
 
 func _complete_bond():
 	var mate = bond_target
@@ -575,7 +670,6 @@ func _complete_bond():
 	# Celebration from shelter
 	_spawn_celebration(spawn_pos)
 	WardenManager.gain_xp("egg_laid")
-	print(name, " laid an egg!")
 
 	# Exit shelter — both become visible and wander away
 	visible = true
@@ -661,10 +755,16 @@ func seek_nearest_shelter():
 				nearest = shelter
 	if nearest:
 		move_to(nearest.global_position)
-		print(name, " is seeking a shelter!")
 
-	var half_area = 19.0
-	if abs(global_position.x) > half_area or abs(global_position.z) > half_area:
+	var half_area: float = ZoneManager.get_garden_half() - 1.0
+	if burden_state == BurdenState.DEPARTING:
+		# Departing roamers walk through the boundary — check if they've left
+		var gone_dist: float = ZoneManager.get_garden_half() + 4.0
+		if abs(global_position.x) > gone_dist or abs(global_position.z) > gone_dist:
+			_on_departed()
+		else:
+			wander_target = _depart_target  # keep heading for the exit
+	elif abs(global_position.x) > half_area or abs(global_position.z) > half_area:
 		global_position.x = clamp(global_position.x, -half_area, half_area)
 		global_position.z = clamp(global_position.z, -half_area, half_area)
 		pick_wander_target()
@@ -682,7 +782,6 @@ func seek_nearest_food():
 			nearest = item
 	if nearest:
 		move_to(nearest.global_position)
-		print(name, " is seeking food!")
 
 func update_needs(delta):
 	# ── Weather modifiers ────────────────────────────────────────────────────
@@ -700,14 +799,17 @@ func update_needs(delta):
 			space_weather  = 1.20  # restless — feel crowded faster
 			safety_weather = 1.10
 
+	# Burdened roamers suffer accelerated need decay
+	var burden_mult: float = 2.0 if burden_state == BurdenState.BURDENED else 1.0
+
 	# Food — straight decay
-	needs["food"] = max(0.0, needs["food"] - need_decay["food"] * food_weather * delta)
+	needs["food"] = max(0.0, needs["food"] - need_decay["food"] * food_weather * burden_mult * delta)
 
 	# Safety — decays normally; shelter restores it passively
 	if has_shelter and is_instance_valid(shelter_node):
 		needs["safety"] = min(1.0, needs["safety"] + 0.008 * delta)
 	else:
-		needs["safety"] = max(0.0, needs["safety"] - need_decay["safety"] * safety_weather * delta)
+		needs["safety"] = max(0.0, needs["safety"] - need_decay["safety"] * safety_weather * burden_mult * delta)
 		# Rain / wind with no shelter: seek one urgently
 		if (weather == WeatherManager.Weather.RAIN or weather == WeatherManager.Weather.WIND) \
 				and state == State.WANDERING:
@@ -716,7 +818,9 @@ func update_needs(delta):
 	# Space — decays faster the more roamers are in the garden
 	var roamer_count: int = get_tree().get_nodes_in_group("roamers").size()
 	var crowding_factor: float = clamp(float(roamer_count) / 6.0, 0.5, 3.0)
-	needs["space"] = max(0.0, needs["space"] - need_decay["space"] * crowding_factor * space_weather * delta)
+	needs["space"] = max(0.0, needs["space"] - need_decay["space"] * crowding_factor * space_weather * burden_mult * delta)
+
+	_update_burden_state(delta)
 
 func update_happiness():
 	var total = 0.0
@@ -725,9 +829,133 @@ func update_happiness():
 	happiness = clamp((total / needs.size()) + SeasonManager.get_happiness_bonus(), 0.0, 1.0)
 	_update_happiness_glow()
 
+# ── Burden / departure state machine ─────────────────────────────────────────
+func _update_burden_state(delta: float) -> void:
+	if burden_state == BurdenState.DEPARTING:
+		return   # no further transitions once departing
+
+	var any_critical := false
+	for n in needs:
+		if needs[n] < CRITICAL_NEED_THRESHOLD:
+			any_critical = true
+			break
+
+	match burden_state:
+		BurdenState.HEALTHY:
+			if any_critical:
+				_critical_timer += delta
+				if _critical_timer >= BURDEN_TRIGGER_SECS:
+					_enter_burdened()
+			else:
+				_critical_timer = max(0.0, _critical_timer - delta * 2.0)
+
+		BurdenState.BURDENED:
+			if not any_critical:
+				recover_from_burden()
+				return
+			# Extra happiness drain while burdened
+			happiness = max(0.0, happiness - 0.003 * delta)
+			_burdened_timer += delta
+			# Periodic cough puff
+			_cough_timer -= delta
+			if _cough_timer <= 0.0:
+				_cough_timer = COUGH_INTERVAL + randf_range(-1.5, 1.5)
+				_spawn_cough_puff()
+			if _burdened_timer >= DEPART_TRIGGER_SECS:
+				_enter_departing()
+
+func _enter_burdened() -> void:
+	burden_state = BurdenState.BURDENED
+	_burdened_timer = 0.0
+	_cough_timer = 2.0   # first cough after 2 s
+	_spawn_burden_aura()
+	GrimshroudManager.set_target(self)
+	_show_toast("⚠", roamer_name + " is struggling...", "Care for them urgently!", 4.5)
+
+func _enter_departing() -> void:
+	burden_state = BurdenState.DEPARTING
+	# Pick a boundary-exit point in roughly the direction the roamer is already facing
+	var half: float = ZoneManager.get_garden_half() + 6.0
+	var dir: Vector3 = (global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1))).normalized()
+	_depart_target = dir * half
+	_depart_target.y = global_position.y
+	wander_target  = _depart_target
+	move_speed     = move_speed * 0.55   # slow, mournful walk
+	_show_toast("🌿", roamer_name + " is leaving the garden...", "Act fast to keep them!", 5.0)
+
+## Restore the roamer to healthy. Called by item use or when needs recover naturally.
+func recover_from_burden() -> void:
+	if burden_state == BurdenState.HEALTHY:
+		return
+	var was_departing: bool = burden_state == BurdenState.DEPARTING
+	burden_state = BurdenState.HEALTHY
+	_critical_timer = 0.0
+	_burdened_timer = 0.0
+	# Undo the departure slow-down if the roamer was already walking out
+	if was_departing:
+		move_speed /= 0.55
+	_remove_burden_aura()
+	GrimshroudManager.clear_target(self)
+	WardenManager.gain_xp("burden_rescued")
+	MilestoneManager.fire("first_rescue", "Kind Warden!", "You rescued a struggling roamer!")
+	_show_toast("✨", roamer_name + " is recovering!", "", 3.0)
+
+func _on_departed() -> void:
+	_remove_burden_aura()
+	GrimshroudManager.clear_target(self)
+	_show_toast("🌿", roamer_name + " returned to the wild.", "", 4.0)
+	queue_free()
+
+## Helper — posts a toast via RoamerUI using the correct 4-arg signature.
+func _show_toast(icon: String, title: String, subtitle: String = "", duration: float = 3.2) -> void:
+	var ui := get_tree().get_root().find_child("RoamerUI", true, false)
+	if ui and ui.has_method("show_toast"):
+		ui.show_toast(icon, title, subtitle, duration)
+
+func _spawn_burden_aura() -> void:
+	if _burden_aura and is_instance_valid(_burden_aura):
+		return
+	_burden_aura = CPUParticles3D.new()
+	_burden_aura.amount          = 10
+	_burden_aura.lifetime        = 2.0
+	_burden_aura.explosiveness   = 0.0
+	_burden_aura.spread          = 180.0
+	_burden_aura.gravity         = Vector3(0, 0.3, 0)
+	_burden_aura.initial_velocity_min = 0.1
+	_burden_aura.initial_velocity_max = 0.3
+	_burden_aura.scale_amount_min = 0.04
+	_burden_aura.scale_amount_max = 0.10
+	_burden_aura.color            = Color(0.25, 0.10, 0.35, 0.7)
+	_burden_aura.position         = Vector3(0, 0.6, 0)
+	add_child(_burden_aura)
+
+func _remove_burden_aura() -> void:
+	if _burden_aura and is_instance_valid(_burden_aura):
+		_burden_aura.queue_free()
+		_burden_aura = null
+
+func _spawn_cough_puff() -> void:
+	var puff := CPUParticles3D.new()
+	puff.one_shot       = true
+	puff.amount         = 8
+	puff.lifetime       = 0.7
+	puff.explosiveness  = 0.9
+	puff.spread         = 40.0
+	puff.gravity        = Vector3(0, 0.5, 0)
+	puff.initial_velocity_min = 0.5
+	puff.initial_velocity_max = 1.2
+	puff.scale_amount_min = 0.05
+	puff.scale_amount_max = 0.12
+	puff.color          = Color(0.65, 0.60, 0.70, 0.6)
+	puff.position       = Vector3(0, 1.0, 0)
+	add_child(puff)
+	puff.emitting = true
+	await get_tree().create_timer(1.5).timeout
+	if is_instance_valid(puff):
+		puff.queue_free()
+
 # ── Happiness glow ────────────────────────────────────────────────────────────
 var _glow_mat: StandardMaterial3D = null
-var _glow_timer: float = 0.0
 
 func _update_happiness_glow():
 	if _is_sleeping:
@@ -749,13 +977,13 @@ func _update_happiness_glow():
 		_glow_mat = base.duplicate()
 		_glow_mat.emission_enabled = true
 		body.set_surface_override_material(0, _glow_mat)
-	# Pulse the glow energy with happiness
-	_glow_timer += 0.016  # approximate frame step; close enough for a cosmetic pulse
-	var pulse := 0.5 + 0.3 * sin(_glow_timer * 1.8)
+	# Pulse the glow energy with happiness — use wall-clock time, no accumulator needed
+	var t: float = Time.get_ticks_msec() * 0.001
+	var pulse: float = 0.5 + 0.3 * sin(t * 1.8)
 	_glow_mat.emission = Color(1.0, 0.75, 0.25)
 	_glow_mat.emission_energy_multiplier = happiness * pulse * 1.8
 
-func _handle_sleep_walk(delta):
+func _handle_sleep_walk(_delta):
 	var dir := _sleep_rest_pos - global_position
 	dir.y = 0.0
 	if dir.length() < 2.5:
@@ -827,7 +1055,7 @@ func _do_curious_tilt():
 
 func pick_wander_target():
 	var wander_range = 20.0
-	var half_area = 19.0
+	var half_area: float = ZoneManager.get_garden_half() - 1.0
 	var new_target = global_position + Vector3(
 		randf_range(-wander_range, wander_range),
 		0,
@@ -890,120 +1118,263 @@ func _play_eat_animation():
 	if not body or _is_sleeping:
 		return
 	_stop_idle_bob()
-	var eat_tween := create_tween().set_trans(Tween.TRANS_SINE)
-	# Dip down, squish wide, pop back
-	eat_tween.tween_property(body, "position:y", _body_rest_y - 0.10, 0.18)
-	eat_tween.parallel().tween_property(body, "scale", Vector3(1.25, 0.78, 1.25), 0.18)
-	eat_tween.tween_property(body, "position:y", _body_rest_y + 0.08,  0.14)
-	eat_tween.parallel().tween_property(body, "scale", Vector3(0.90, 1.15, 0.90), 0.14)
-	eat_tween.tween_property(body, "position:y", _body_rest_y,          0.20).set_ease(Tween.EASE_OUT)
-	eat_tween.parallel().tween_property(body, "scale", Vector3(1.0, 1.0, 1.0),   0.20)
-	eat_tween.tween_callback(_start_idle_bob)
+	var eat_tween := create_tween().set_trans(Tween.TRANS_SINE).set_loops(2)
+	eat_tween.tween_property(body, "position:y", _body_rest_y - 0.15, 0.25)
+	eat_tween.tween_property(body, "position:y", _body_rest_y,         0.20).set_ease(Tween.EASE_OUT)
+	eat_tween.tween_interval(0.3)
+	eat_tween.finished.connect(_start_idle_bob)
 
-func check_stage_progress():
-	match attraction_stage:
-		AttractionStage.APPEARS:
-			if happiness > 0.5:
-				attraction_stage = AttractionStage.VISITS
-				print(name, " is now VISITING!")
-				WardenManager.gain_xp("roamer_visits")
-		AttractionStage.VISITS:
-			if happiness > 0.7 and has_shelter:
-				attraction_stage = AttractionStage.RESIDENT
-				print(name, " is now a RESIDENT!")
-				WardenManager.gain_xp("roamer_resident")
-				MilestoneManager.fire("first_resident", "First Resident! 🏡", species_id + " has settled in your garden.")
-			elif happiness > 0.7 and not has_shelter:
-				print(name, " needs a shelter to become Resident!")
-		AttractionStage.RESIDENT:
-			if happiness > 0.9 and is_adult:
-				attraction_stage = AttractionStage.BONDED
-				print(name, " is now BONDED!")
-				WardenManager.gain_xp("roamer_bonded")
-				MilestoneManager.fire("first_bonded", "Garden Bond! ✨", species_id + " has truly bonded with your garden.")
-				AudioManager.play_level_up()
-				ParticleManager.spawn_bond_sparkle(global_position)
-				ParticleManager.attach_dewdrop_aura(self)
 
-func _get_selectable_mesh() -> MeshInstance3D:
-	return get_node_or_null("Body") as MeshInstance3D
+# -- Name Label -------------------------------------------------------------
 
-func on_selected():
-	var body := _get_selectable_mesh()
-	if body:
-		var base_mat = body.get_active_material(0)
-		if base_mat:
-			var unique_mat = base_mat.duplicate()
-			unique_mat.emission_enabled = true
-			unique_mat.emission = Color(1.0, 0.6, 0.1)
-			unique_mat.emission_energy_multiplier = 2.0
-			body.set_surface_override_material(0, unique_mat)
-	if selection_ring:
-		selection_ring.visible = true
-		_ring_pulse_timer = 0.0
-
-func on_deselected():
-	var body := _get_selectable_mesh()
-	if body:
-		body.set_surface_override_material(0, _glow_mat)
-	if selection_ring:
-		selection_ring.visible = false
-
-# ── Naming ────────────────────────────────────────────────────────────────────
-
-func _create_name_label():
+func _create_name_label() -> void:
+	if _name_label_3d:
+		return
 	_name_label_3d = Label3D.new()
 	_name_label_3d.name = "NameLabel"
 	_name_label_3d.text = roamer_name
-	_name_label_3d.font_size = 28
+	_name_label_3d.font_size = 48
 	_name_label_3d.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_name_label_3d.no_depth_test = true
-	_name_label_3d.modulate = Color(0.92, 0.98, 0.80, 0.90)
-	_name_label_3d.outline_modulate = Color(0.05, 0.10, 0.03, 1.0)
-	_name_label_3d.outline_size = 6
-	_name_label_3d.position = Vector3(0.0, 1.85, 0.0)
+	_name_label_3d.position = Vector3(0.0, 1.8, 0.0)
+	_name_label_3d.modulate = Color(0.9, 1.0, 0.85)
+	_name_label_default_modulate = _name_label_3d.modulate
 	add_child(_name_label_3d)
 
-func set_roamer_name(new_name: String) -> void:
-	roamer_name = new_name.strip_edges()
-	if roamer_name == "":
-		roamer_name = NAME_POOL[randi() % NAME_POOL.size()]
-	if _name_label_3d:
-		_name_label_3d.text = roamer_name
 
-# ── Traits ────────────────────────────────────────────────────────────────────
+# -- Traits -----------------------------------------------------------------
 
-func assign_random_traits(count: int = 1) -> void:
-	var keys := TRAIT_POOL.keys()
+func assign_random_traits(count: int) -> void:
+	var keys: Array = TRAIT_POOL.keys()
 	keys.shuffle()
-	traits.clear()
-	for i in range(min(count, keys.size())):
-		traits.append(keys[i])
+	traits = keys.slice(0, min(count, keys.size()))
+	_apply_trait_modifiers()
 
 func _apply_trait_modifiers() -> void:
-	var speed_mult := 1.0
-	var food_mult  := 1.0
-	var safety_mult := 1.0
+	var speed_mult   := 1.0
+	var food_mult    := 1.0
+	var safety_mult  := 1.0
 	var dewdrop_mult := 1.0
 	for trait_id in traits:
-		var t: Dictionary = TRAIT_POOL.get(trait_id, {})
-		if t.is_empty():
-			continue
-		speed_mult    *= t.get("speed_mult",   1.0)
-		food_mult     *= t.get("food_mult",    1.0)
-		safety_mult   *= t.get("safety_mult",  1.0)
-		dewdrop_mult  *= t.get("dewdrop_mult", 1.0)
-	move_speed             *= speed_mult
-	need_decay["food"]     *= food_mult
-	need_decay["safety"]   *= safety_mult
-	dewdrop_interval       /= dewdrop_mult  # lower interval = earn faster
+		if TRAIT_POOL.has(trait_id):
+			var t: Dictionary = TRAIT_POOL[trait_id]
+			speed_mult   *= t.get("speed_mult",   1.0)
+			food_mult    *= t.get("food_mult",    1.0)
+			safety_mult  *= t.get("safety_mult",  1.0)
+			dewdrop_mult *= t.get("dewdrop_mult", 1.0)
+	move_speed           = 2.5 * speed_mult
+	need_decay["food"]   = 0.004 * food_mult
+	need_decay["safety"] = 0.002 * safety_mult
+	dewdrop_interval     = 5.0 / max(0.1, dewdrop_mult)
+
+
+# -- Stage progression ------------------------------------------------------
+
+func check_stage_progress() -> void:
+	match attraction_stage:
+		AttractionStage.APPEARS:
+			if needs["food"] > 0.5 and happiness > 0.5:
+				attraction_stage = AttractionStage.VISITS
+		AttractionStage.VISITS:
+			# Requires a species-specific den (not just any shelter) + happiness threshold
+			var has_own_den: bool = AttractionManager.can_reside(species_id, self)
+			if has_own_den and happiness > 0.7:
+				attraction_stage = AttractionStage.RESIDENT
+				WardenManager.gain_xp("roamer_resident")
+		AttractionStage.RESIDENT:
+			if happiness > 0.9:
+				attraction_stage = AttractionStage.BONDED
+				WardenManager.gain_xp("roamer_bonded")
+				_update_happiness_glow()
+
+
+# -- Interactions (pet / play / gift) -------------------------------------
+
+const INTERACTION_COOLDOWNS := {
+	"pet":  30.0,
+	"play": 45.0,
+	"gift": 60.0,
+}
+
+var _interaction_timers: Dictionary = {
+	"pet":  0.0,
+	"play": 0.0,
+	"gift": 0.0,
+}
+
+func _tick_interaction_cooldowns(delta: float) -> void:
+	for key in _interaction_timers:
+		if _interaction_timers[key] > 0.0:
+			_interaction_timers[key] = max(0.0, _interaction_timers[key] - delta)
+
+func can_interact(action: String) -> bool:
+	return _interaction_timers.get(action, 0.0) <= 0.0
+
+func get_cooldown_remaining(action: String) -> float:
+	return _interaction_timers.get(action, 0.0)
+
+func interact_pet() -> bool:
+	if not can_interact("pet"):
+		return false
+	_interaction_timers["pet"] = INTERACTION_COOLDOWNS["pet"]
+	needs["safety"] = min(1.0, needs["safety"] + 0.25)
+	happiness = min(1.0, happiness + 0.10)
+	ObjectiveManager.record_event("interaction")
+	check_stage_progress()
+	return true
+
+func interact_play() -> bool:
+	if not can_interact("play"):
+		return false
+	_interaction_timers["play"] = INTERACTION_COOLDOWNS["play"]
+	needs["space"] = min(1.0, needs["space"] + 0.30)
+	happiness = min(1.0, happiness + 0.10)
+	ObjectiveManager.record_event("interaction")
+	check_stage_progress()
+	return true
+
+func interact_gift() -> bool:
+	if not can_interact("gift"):
+		return false
+	# Attempt to consume a treat from inventory
+	var consumed := false
+	if InventoryManager.remove_item("Roamer Treat"):
+		consumed = true
+	elif InventoryManager.remove_item("Fresh Berries"):
+		consumed = true
+	if not consumed:
+		return false
+	_interaction_timers["gift"] = INTERACTION_COOLDOWNS["gift"]
+	needs["food"] = min(1.0, needs["food"] + 0.50)
+	happiness = min(1.0, happiness + 0.15)
+	ObjectiveManager.record_event("interaction")
+	check_stage_progress()
+	return true
+
+
+# -- Selection ------------------------------------------------------------
+
+func on_selected() -> void:
+	if selection_ring:
+		selection_ring.visible = true
+	if _name_label_3d:
+		_name_label_3d.modulate = Color(1.0, 0.95, 0.5)
+
+func on_deselected() -> void:
+	if selection_ring:
+		selection_ring.visible = false
+	if _name_label_3d:
+		_name_label_3d.modulate = _name_label_default_modulate
+
+func show_selection_ring() -> void:
+	if selection_ring:
+		selection_ring.visible = true
+
+func hide_selection_ring() -> void:
+	if selection_ring:
+		selection_ring.visible = false
+
+
+# -- Public name / trait helpers ------------------------------------------
+
+func set_roamer_name(new_name: String) -> void:
+	roamer_name = new_name
+	if _name_label_3d:
+		_name_label_3d.text = new_name
 
 func get_traits_display() -> String:
 	if traits.is_empty():
-		return ""
-	var parts := []
+		return "None"
+	var parts: Array = []
 	for trait_id in traits:
 		var t: Dictionary = TRAIT_POOL.get(trait_id, {})
-		if not t.is_empty():
-			parts.append(t.get("icon", "") + " " + t.get("name", trait_id))
+		var icon: String = t.get("icon", "")
+		var tname: String = t.get("name", trait_id)
+		parts.append(icon + " " + tname if icon != "" else tname)
 	return "  ".join(parts)
+
+
+# ── Species Conflict System ────────────────────────────────────────────────────
+
+func _scan_for_conflicts() -> void:
+	if state == State.AGITATED or _agitation_cooldown > 0.0:
+		return
+	if not CONFLICTS.has(species_id):
+		return
+	var rivals: Array = CONFLICTS[species_id]
+	for body in get_tree().get_nodes_in_group("roamers"):
+		if body == self:
+			continue
+		if not (body.species_id in rivals):
+			continue
+		var dist: float = global_position.distance_to(body.global_position)
+		if dist < 4.0:
+			_begin_agitation(body)
+			return
+
+func _begin_agitation(partner: Node) -> void:
+	state = State.AGITATED
+	_agitation_timer = 0.0
+	_conflict_partner = partner
+	_eye_flashing = true
+	_eye_flash_timer = 0.0
+	AudioManager.play_agitated()
+	if partner.has_method("_begin_agitation") and partner.state != State.AGITATED:
+		partner._begin_agitation(self)
+
+func _handle_agitated(delta: float) -> void:
+	# Flash eye shader param
+	_eye_flash_timer += delta
+	if _eye_flashing:
+		var flash: float = abs(sin(_eye_flash_timer * 6.0))
+		_set_eye_flash(flash)
+
+	# Face the conflict partner
+	if is_instance_valid(_conflict_partner):
+		var dir: Vector3 = (_conflict_partner as Node3D).global_position - global_position
+		dir.y = 0.0
+		if dir.length() > 0.01:
+			var target_basis := Basis.looking_at(dir.normalized(), Vector3.UP)
+			global_basis = global_basis.slerp(target_basis, delta * 4.0)
+			velocity.x = 0.0
+			velocity.z = 0.0
+
+	_agitation_timer += delta
+	if _agitation_timer >= AGITATION_CONTACT_TIME:
+		_resolve_conflict()
+
+func _resolve_conflict() -> void:
+	# Drain happiness and bounce apart
+	happiness = max(0.0, happiness - AGITATION_DRAIN)
+	_set_eye_flash(0.0)
+	_eye_flashing = false
+	# Push away from partner
+	if is_instance_valid(_conflict_partner):
+		var away: Vector3 = (global_position - (_conflict_partner as Node3D).global_position).normalized()
+		away.y = 0.0
+		wander_target = global_position + away * 6.0
+	_conflict_partner = null
+	state = State.WANDERING
+	_agitation_cooldown = AGITATION_COOLDOWN
+	_show_toast("😤", roamer_name + " had a conflict!", "They've lost some happiness.", 3.5)
+
+## Override in subclasses to add species-specific agitation visuals.
+func play_agitated() -> void:
+	pass
+
+func calm_agitation() -> void:
+	"""Called by player (watering can interaction) to soothe the roamer."""
+	if state != State.AGITATED:
+		return
+	_set_eye_flash(0.0)
+	_eye_flashing = false
+	_conflict_partner = null
+	state = State.WANDERING
+	_agitation_cooldown = AGITATION_COOLDOWN * 0.5
+	happiness = min(1.0, happiness + 0.05)
+	_show_toast("💧", roamer_name + " has calmed down!", "", 3.0)
+
+func _set_eye_flash(intensity: float) -> void:
+	"""Override per-species to drive a shader param or material colour."""
+	pass
+ 

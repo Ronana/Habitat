@@ -4,10 +4,19 @@ var _light: OmniLight3D = null
 var _flicker_timer: float = 0.0
 var _next_flicker: float = 0.0
 var _sparkle_timer: float = 0.0
+var _next_sparkle: float = randf_range(1.8, 3.5)  # fixed threshold, not re-rolled per frame
 var _base_energy: float = 1.4
 
 func _ready():
 	add_to_group("decoratives")
+	# Click/selection body — lets raycast hit this item
+	var _cb := StaticBody3D.new()
+	var _cs := CollisionShape3D.new()
+	var _sp := SphereShape3D.new()
+	_sp.radius = 0.4
+	_cs.shape  = _sp
+	_cb.add_child(_cs)
+	add_child(_cb)
 	_flicker_timer = randf_range(0.0, 2.0)  # stagger jars placed together
 	_build()
 
@@ -85,8 +94,9 @@ func _process(delta):
 		tween.tween_property(_light, "light_energy", target, _next_flicker * 0.8)
 
 	# Spawn a floating sparkle dot every few seconds
-	if _sparkle_timer >= randf_range(1.8, 3.5):
+	if _sparkle_timer >= _next_sparkle:
 		_sparkle_timer = 0.0
+		_next_sparkle = randf_range(1.8, 3.5)
 		_spawn_sparkle()
 
 func _spawn_sparkle():
@@ -106,5 +116,3 @@ func _spawn_sparkle():
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(dot, "position:y", start_offset.y + randf_range(0.3, 0.7), 1.8) \
 		.set_trans(Tween.TRANS_SINE)
-	tween.tween_property(dot, "modulate:a", 0.0, 1.8).set_trans(Tween.TRANS_QUAD)
-	tween.chain().tween_callback(dot.queue_free)

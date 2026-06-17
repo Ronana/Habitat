@@ -8,24 +8,55 @@ var selected_item   : Node3D           = null
 var _item_moving    : bool             = false
 var _pre_focus_zoom : float            = -1.0
 
-# ── Only items within this XZ distance from origin are selectable ─────────────
-const GARDEN_HALF := 20.0
+# ── Garden half is dynamic (grows with zone unlocks) ─────────────────────────
 
 # ── Cursor world position (shared with roamers) ───────────────────────────────
 var cursor_world_pos     : Vector3 = Vector3.ZERO
 var _cursor_timer        : float   = 0.0
+var _raw_cursor_pos      : Vector3 = Vector3.ZERO  # unsnapped terrain hit
+var _pc_lock_target      : Node3D  = null
+const PC_LOCK_RADIUS     : float   = 2.4
+const PC_LOCK_SPEED      : float   = 16.0
+const PC_FREE_SPEED      : float   = 22.0
+
+# ── Move (VP-style lift) ─────────────────────────────────────────────────────
+const MOVE_LIFT_HEIGHT   : float   = 1.5
+const MOVE_BOB_SPEED     : float   = 3.2
+const MOVE_BOB_AMP       : float   = 0.07
+var _move_bob_timer      : float   = 0.0
+var _move_origin         : Vector3 = Vector3.ZERO   # for cancel/return
+var _move_shadow         : MeshInstance3D = null
 
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
 	_cursor_timer -= delta
 	if _cursor_timer <= 0.0:
-		_cursor_timer = 0.1
+		_cursor_timer = 0.05
 		_refresh_cursor()
 
-	# Dragging a placed item — snap it to terrain under cursor
+	# Lock-on disabled while moving (don't snap the hovering item to other objects)
+	if _item_moving:
+		cursor_world_pos = _raw_cursor_pos
+	else:
+		_pc_lock_target = _find_pc_lock_target()
+		if is_instance_valid(_pc_lock_target):
+			var dest := Vector3(_pc_lock_target.global_position.x,
+								_raw_cursor_pos.y,
+								_pc_lock_target.global_position.z)
+			cursor_world_pos = cursor_world_pos.lerp(dest, delta * PC_LOCK_SPEED)
+		else:
+			cursor_world_pos = cursor_world_pos.lerp(_raw_cursor_pos, delta * PC_FREE_SPEED)
+
+	# VP-style item lift — float the held item above the cursor with a gentle bob
 	if _item_moving and is_instance_valid(selected_item):
-		selected_item.global_position = cursor_world_pos
+		_move_bob_timer += delta
+		var bob   := sin(_move_bob_timer * MOVE_BOB_SPEED) * MOVE_BOB_AMP
+		var hover := Vector3(_raw_cursor_pos.x,
+							 _raw_cursor_pos.y + MOVE_LIFT_HEIGHT + bob,
+							 _raw_cursor_pos.z)
+		selected_item.global_position = selected_item.global_position.lerp(hover, delta * 14.0)
+		_update_move_shadow()
 
 func _refresh_cursor() -> void:
 	var cam : Camera3D = get_camera()
@@ -45,14 +76,33 @@ func _refresh_cursor() -> void:
 
 	var result := get_world_3d().direct_space_state.intersect_ray(query)
 	if result:
-		cursor_world_pos = result.position
+		_raw_cursor_pos = result.position
 	else:
 		# Terrain3D collision not hit — fall back to Y=0 world plane so the
 		# cursor ring always tracks the mouse even before collision is ready.
 		var plane := Plane(Vector3.UP, 0.0)
 		var hit = plane.intersects_ray(origin, cam.project_ray_normal(mp))
 		if hit != null:
-			cursor_world_pos = hit
+			_raw_cursor_pos = hit
+	# Clamp to the same bound as the camera
+	var cb: float = ZoneManager.get_garden_half() + 10.0
+	_raw_cursor_pos.x = clamp(_raw_cursor_pos.x, -cb, cb)
+	_raw_cursor_pos.z = clamp(_raw_cursor_pos.z, -cb, cb)
+
+func _find_pc_lock_target() -> Node3D:
+	var best_dist: float = PC_LOCK_RADIUS
+	var best: Node3D = null
+	for g in ["roamers", "placeable_items", "food", "shelters", "zone_markers", "npcs", "debris", "trees"]:
+		for node in get_tree().get_nodes_in_group(g):
+			if not node is Node3D:
+				continue
+			var n3 := node as Node3D
+			var d := Vector2(_raw_cursor_pos.x - n3.global_position.x,
+							  _raw_cursor_pos.z - n3.global_position.z).length()
+			if d < best_dist:
+				best_dist = d
+				best = n3
+	return best
 
 func _collect_rids(node: Node, out: Array[RID]) -> void:
 	if node is PhysicsBody3D:
@@ -78,9 +128,13 @@ func _input(event: InputEvent) -> void:
 			_direct_roamer()
 
 func _on_left_click(is_double: bool) -> void:
-	# Double-click feeds a selected roamer
+	# Double-click on an agitated roamer calms it; otherwise feed
 	if is_double and selected_roamer:
-		selected_roamer.feed(0.3)
+		if selected_roamer.state == selected_roamer.State.AGITATED:
+			selected_roamer.calm_agitation()
+			_spawn_calm_splash(selected_roamer.global_position)
+		else:
+			selected_roamer.feed(0.3)
 		return
 
 	# ── Confirm a pending drag first ───────────────────────────────────────
@@ -95,10 +149,11 @@ func _on_left_click(is_double: bool) -> void:
 	if tool == "shovel":
 		return
 
-	# ── Hand / default: select roamer, then item, then trader ─────────────
+	# ── Hand / default: select roamer, then zone marker, then item, then trader ─
 	var hit_roamer := try_select_roamer()
 	if not hit_roamer:
-		_try_select_item()
+		if not _try_interact_with_zone_marker():
+			_try_select_item()
 	try_interact_with_trader()
 
 # ── Shovel hit logic ──────────────────────────────────────────────────────────
@@ -151,8 +206,8 @@ func _try_select_item() -> bool:
 			var item := node as Node3D
 			if item and _in_garden(item):
 				if selected_item == item:
-					# Second click on a placeable item → enter move mode
-					if item.is_in_group("placeable_items"):
+					# Second click on a moveable item → enter move mode
+					if _is_moveable(item):
 						_start_move(item)
 					return true
 				_deselect_item()
@@ -179,21 +234,73 @@ func _deselect_item() -> void:
 	selected_item = null
 	_restore_zoom()
 
-# ── Move mode ─────────────────────────────────────────────────────────────────
+# ── Move mode (VP-style) ─────────────────────────────────────────────────────
+
+func _is_moveable(item: Node) -> bool:
+	return (item.is_in_group("placeable_items") or
+			item.is_in_group("shelters") or
+			item.is_in_group("food") or
+			item.is_in_group("decoratives"))
 
 func _start_move(item: Node3D) -> void:
-	_item_moving = true
+	_item_moving    = true
+	_move_origin    = item.global_position
+	_move_bob_timer = 0.0
 	_set_collision(item, false)
+	_create_move_shadow()
+	AudioManager.play_select()
 
 func _confirm_move() -> void:
-	if is_instance_valid(selected_item):
-		_set_collision(selected_item, true)
+	if not is_instance_valid(selected_item):
+		_item_moving = false
+		return
 	_item_moving = false
+	_destroy_move_shadow()
+	var item := selected_item
+	var land := Vector3(_raw_cursor_pos.x, _raw_cursor_pos.y, _raw_cursor_pos.z)
+	var tw   := create_tween()
+	tw.tween_property(item, "global_position", land, 0.18)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
+	tw.tween_callback(func(): _set_collision(item, true))
+	AudioManager.play_place()
 
 func _cancel_move() -> void:
-	if is_instance_valid(selected_item):
-		_set_collision(selected_item, true)
+	if not is_instance_valid(selected_item):
+		_item_moving = false
+		return
 	_item_moving = false
+	_destroy_move_shadow()
+	var item   := selected_item
+	var origin := _move_origin
+	var tw     := create_tween()
+	tw.tween_property(item, "global_position", origin, 0.22)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tw.tween_callback(func(): _set_collision(item, true))
+
+func _create_move_shadow() -> void:
+	_move_shadow = MeshInstance3D.new()
+	var disc          := CylinderMesh.new()
+	disc.top_radius    = 0.55
+	disc.bottom_radius = 0.55
+	disc.height        = 0.02
+	_move_shadow.mesh  = disc
+	var mat           := StandardMaterial3D.new()
+	mat.albedo_color   = Color(0.0, 0.0, 0.0, 0.32)
+	mat.transparency   = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode   = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test  = false
+	_move_shadow.set_surface_override_material(0, mat)
+	get_parent().add_child(_move_shadow)
+
+func _destroy_move_shadow() -> void:
+	if is_instance_valid(_move_shadow):
+		_move_shadow.queue_free()
+	_move_shadow = null
+
+func _update_move_shadow() -> void:
+	if is_instance_valid(_move_shadow):
+		_move_shadow.global_position = Vector3(
+			_raw_cursor_pos.x, _raw_cursor_pos.y + 0.03, _raw_cursor_pos.z)
 
 func _set_collision(node: Node3D, enabled: bool) -> void:
 	# Handle root-level physics body
@@ -267,11 +374,13 @@ func _is_world_item(node: Node) -> bool:
 			node.is_in_group("trees") or
 			node.is_in_group("placeable_items") or
 			node.is_in_group("food") or
-			node.is_in_group("shelters"))
+			node.is_in_group("shelters") or
+			node.is_in_group("decoratives"))
 
 func _in_garden(item: Node3D) -> bool:
-	return (abs(item.global_position.x) <= GARDEN_HALF and
-			abs(item.global_position.z) <= GARDEN_HALF)
+	var half: float = ZoneManager.get_garden_half()
+	return (abs(item.global_position.x) <= half and
+			abs(item.global_position.z) <= half)
 
 func _active_tool() -> String:
 	var tm := get_parent().get_node_or_null("ToolManager")
@@ -288,6 +397,33 @@ func _raycast(dist: float) -> Dictionary:
 	var end := org + cam.project_ray_normal(mp) * dist
 	return get_world_3d().direct_space_state.intersect_ray(
 		PhysicsRayQueryParameters3D.create(org, end))
+
+## Like _raycast but passes THROUGH bodies that don't belong to the target group,
+## retrying up to max_depth times. Allows selecting roamers sitting on rocks/terrain.
+func _raycast_to_group(group: String, dist: float, max_depth: int = 8) -> Dictionary:
+	var cam : Camera3D = get_camera()
+	if not cam:
+		return {}
+	var mp  := get_viewport().get_mouse_position()
+	var org := cam.project_ray_origin(mp)
+	var end := org + cam.project_ray_normal(mp) * dist
+	var space := get_world_3d().direct_space_state
+	var exclude: Array[RID] = []
+	for _i in range(max_depth):
+		var params := PhysicsRayQueryParameters3D.create(org, end)
+		params.exclude = exclude
+		var result := space.intersect_ray(params)
+		if result.is_empty():
+			break
+		# Walk up from the collider — if any ancestor is in the group, return this hit
+		var node := result.collider as Node
+		while node:
+			if node.is_in_group(group):
+				return result
+			node = node.get_parent()
+		# Not in the group — exclude this body and try deeper
+		exclude.append(result.rid)
+	return {}
 
 func get_camera() -> Camera3D:
 	return get_viewport().get_camera_3d()
@@ -309,8 +445,8 @@ func _spawn_popup(world_pos: Vector3, text: String) -> void:
 # ── Roamer logic (preserved) ──────────────────────────────────────────────────
 
 func try_select_roamer() -> bool:
-	var result := _raycast(100.0)
-	if result:
+	var result := _raycast_to_group("roamers", 100.0)
+	if not result.is_empty():
 		var node := result.collider as Node
 		while node:
 			if node.is_in_group("roamers"):
@@ -352,18 +488,58 @@ func select_roamer(roamer) -> void:
 	roamer_ui.show_roamer(roamer)
 
 func deselect_roamer() -> void:
-	selected_roamer.on_deselected()
+	if is_instance_valid(selected_roamer):
+		selected_roamer.on_deselected()
 	roamer_ui.hide_roamer()
 	selected_roamer = null
 
-func try_interact_with_trader() -> void:
+func _try_interact_with_zone_marker() -> bool:
 	var result := _raycast(100.0)
 	if not result:
+		return false
+	var node := result.collider as Node
+	while node:
+		if node.is_in_group("zone_markers"):
+			var garden := get_parent()
+			if garden and garden.has_method("show_zone_unlock_popup"):
+				garden.show_zone_unlock_popup()
+			return true
+		node = node.get_parent()
+	return false
+
+func try_interact_with_trader() -> void:
+	var result := _raycast_to_group("npcs", 100.0)
+	if result.is_empty():
 		return
 	var node := result.collider as Node
 	while node:
-		if node.name == "Maren":
-			node.show_selection_ring()
+		if node.name == "Maren" or node.is_in_group("torvald") or node.is_in_group("gus") or node.is_in_group("doc_birtle"):
+			if node.has_method("show_selection_ring"):
+				node.show_selection_ring()
 			roamer_ui.open_shop(node)
 			return
 		node = node.get_parent()
+
+func _spawn_calm_splash(pos: Vector3) -> void:
+	# Simple GPUParticles3D burst — gentle blue-white dots
+	var p := GPUParticles3D.new()
+	p.emitting   = true
+	p.one_shot   = true
+	p.explosiveness = 0.9
+	p.amount     = 18
+	p.lifetime   = 0.8
+	p.global_position = pos + Vector3(0, 0.5, 0)
+	var mat := ParticleProcessMaterial.new()
+	mat.direction        = Vector3(0, 1, 0)
+	mat.spread           = 60.0
+	mat.initial_velocity_min = 1.5
+	mat.initial_velocity_max = 3.0
+	mat.gravity          = Vector3(0, -4, 0)
+	mat.color            = Color(0.5, 0.85, 1.0, 0.9)
+	p.process_material   = mat
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.04
+	mesh.height = 0.08
+	p.draw_pass_1 = mesh
+	get_parent().add_child(p)
+	p.finished.connect(p.queue_free)

@@ -1,0 +1,168 @@
+[gd_scene format=3 uid="uid://d02bbe0ujliyy"]
+
+[ext_resource type="Script" path="res://scripts/thornmouse.gd" id="1_tm"]
+
+; ── Materials ──────────────────────────────────────────────────────────────────
+[sub_resource type="StandardMaterial3D" id="Mat_fur"]
+albedo_color = Color(0.62, 0.42, 0.22, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="Mat_belly"]
+albedo_color = Color(0.88, 0.76, 0.60, 1)
+roughness = 0.90
+
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.12, 0.08, 0.05, 1)
+roughness = 0.80
+
+[sub_resource type="StandardMaterial3D" id="Mat_ear_inner"]
+albedo_color = Color(0.85, 0.55, 0.55, 1)
+roughness = 0.95
+
+; ── Meshes ─────────────────────────────────────────────────────────────────────
+[sub_resource type="SphereMesh" id="Mesh_body"]
+material = SubResource("Mat_fur")
+radius = 0.18
+height = 0.28
+
+[sub_resource type="SphereMesh" id="Mesh_belly"]
+material = SubResource("Mat_belly")
+radius = 0.14
+height = 0.10
+
+[sub_resource type="SphereMesh" id="Mesh_head"]
+material = SubResource("Mat_fur")
+radius = 0.13
+height = 0.18
+
+[sub_resource type="CylinderMesh" id="Mesh_ear"]
+material = SubResource("Mat_fur")
+top_radius = 0.065
+bottom_radius = 0.055
+height = 0.10
+
+[sub_resource type="CylinderMesh" id="Mesh_ear_inner"]
+material = SubResource("Mat_ear_inner")
+top_radius = 0.040
+bottom_radius = 0.034
+height = 0.07
+
+[sub_resource type="CylinderMesh" id="Mesh_leg"]
+material = SubResource("Mat_fur")
+top_radius = 0.04
+bottom_radius = 0.042
+height = 0.10
+
+[sub_resource type="SphereMesh" id="Mesh_eye"]
+material = SubResource("Mat_dark")
+radius = 0.025
+height = 0.03
+
+[sub_resource type="SphereMesh" id="Mesh_nose"]
+material = SubResource("Mat_dark")
+radius = 0.018
+height = 0.022
+
+[sub_resource type="SphereMesh" id="Mesh_tail_base"]
+material = SubResource("Mat_fur")
+radius = 0.055
+height = 0.08
+
+[sub_resource type="SphereMesh" id="Mesh_tail_tip"]
+material = SubResource("Mat_belly")
+radius = 0.040
+height = 0.06
+
+; ── Collision ──────────────────────────────────────────────────────────────────
+[sub_resource type="CapsuleShape3D" id="Col"]
+radius = 0.20
+height = 0.40
+
+; ── Scene tree ─────────────────────────────────────────────────────────────────
+[node name="Thornmouse" type="CharacterBody3D" groups=["roamers"]]
+floor_max_angle = 1.5707964
+floor_snap_length = 0.5
+script = ExtResource("1_tm")
+
+; Body — small oval torso
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.1, 0, 0, 0, 0.85, 0, 0, 0, 1.05, 0, 0.20, 0)
+mesh = SubResource("Mesh_body")
+
+; Belly — cream underside
+[node name="Belly" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0, 0, 0, 0, 0.25, 0, 0, 0, 1.0, 0, 0.16, 0.06)
+mesh = SubResource("Mesh_belly")
+
+; Head
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, -0.20)
+mesh = SubResource("Mesh_head")
+
+; Ears — large rounded, angled outward
+[node name="EarL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.085, 0.46, -0.18)
+mesh = SubResource("Mesh_ear")
+
+[node name="EarL_inner" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.085, 0.46, -0.175)
+mesh = SubResource("Mesh_ear_inner")
+
+[node name="EarR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.085, 0.46, -0.18)
+mesh = SubResource("Mesh_ear")
+
+[node name="EarR_inner" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.085, 0.46, -0.175)
+mesh = SubResource("Mesh_ear_inner")
+
+; Eyes
+[node name="EyeL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.065, 0.34, -0.31)
+mesh = SubResource("Mesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.065, 0.34, -0.31)
+mesh = SubResource("Mesh_eye")
+
+; Nose
+[node name="Nose" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.295, -0.33)
+mesh = SubResource("Mesh_nose")
+
+; Legs — four short stubs
+[node name="FrontLegL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.10, 0.05, -0.10)
+mesh = SubResource("Mesh_leg")
+
+[node name="FrontLegR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.10, 0.05, -0.10)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.10, 0.05, 0.10)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.10, 0.05, 0.10)
+mesh = SubResource("Mesh_leg")
+
+; Tail — two segments curving up at back
+[node name="TailBase" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7, 0, 0, 0, 0.5, 0, 0, 0, 1.8, 0, 0.22, 0.22)
+mesh = SubResource("Mesh_tail_base")
+
+[node name="TailTip" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.55, 0, 0, 0, 0.45, 0, 0, 0, 1.2, 0, 0.28, 0.38)
+mesh = SubResource("Mesh_tail_tip")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.20, 0)
+shape = SubResource("Col")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+billboard = 1
+no_depth_test = true
+text = "Thornmouse"
+font_size = 22

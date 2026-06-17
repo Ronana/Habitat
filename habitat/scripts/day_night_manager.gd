@@ -66,7 +66,7 @@ func _process(delta):
 	current_time += time_per_second * delta
 	if current_time >= 24.0:
 		current_time = 0.0
-		emit_signal("time_changed", current_time)
+		time_changed.emit(current_time)
 	
 	update_lighting()
 

@@ -1,0 +1,34 @@
+[gd_scene format=3 uid="uid://dljh1gjf0tuiq"]
+
+[ext_resource type="Script" uid="uid://cd7aopwwcrix" path="res://scripts/shelter.gd" id="1_shelter"]
+[ext_resource type="PackedScene" uid="uid://ckldipu4qypwn" path="res://assets/models/exported/GlowfoxHome.glb" id="2_rgasc"]
+
+[sub_resource type="BoxShape3D" id="Shape_area"]
+
+[sub_resource type="BoxShape3D" id="Shape_body"]
+
+[node name="GlowFoxDen" type="Node3D" unique_id=864364797]
+script = ExtResource("1_shelter")
+locked_species = "GlowFox"
+
+[node name="GlowfoxHome" parent="." unique_id=559640681 instance=ExtResource("2_rgasc")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0.71170676, -1.4731865)
+
+[node name="ShelterLabel" type="Label3D" parent="." unique_id=1193969251]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6, 0)
+billboard = 1
+no_depth_test = true
+text = "GlowFox Den"
+font_size = 28
+
+[node name="ShelterArea" type="Area3D" parent="." unique_id=370099016]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShelterArea" unique_id=1572601989]
+transform = Transform3D(3, 0, 0, 0, 2, 0, 0, 0, 3, 0, 1, 0)
+shape = SubResource("Shape_area")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=434495756]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=1296944455]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 1, 0)
+shape = SubResource("Shape_body")

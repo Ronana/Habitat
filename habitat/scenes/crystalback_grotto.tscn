@@ -1,0 +1,122 @@
+[gd_scene format=3 uid="uid://bmt64jy8n505q"]
+
+[ext_resource type="Script" path="res://scripts/shelter.gd" id="1_shelter"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_rock"]
+albedo_color = Color(0.48, 0.52, 0.56, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Mat_crystal_a"]
+albedo_color = Color(0.55, 0.82, 0.98, 0.80)
+roughness = 0.12
+metallic = 0.25
+transparency = 1
+emission_enabled = true
+emission = Color(0.35, 0.65, 1.0, 1)
+emission_energy_multiplier = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_crystal_b"]
+albedo_color = Color(0.65, 0.72, 0.95, 0.75)
+roughness = 0.18
+metallic = 0.20
+transparency = 1
+emission_enabled = true
+emission = Color(0.55, 0.60, 1.0, 1)
+emission_energy_multiplier = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Mat_moss"]
+albedo_color = Color(0.28, 0.52, 0.24, 1)
+roughness = 0.96
+
+[sub_resource type="SphereMesh" id="Mesh_rock_base"]
+material = SubResource("Mat_rock")
+radius = 0.80
+height = 0.90
+
+[sub_resource type="BoxMesh" id="Mesh_rock_slab"]
+material = SubResource("Mat_rock")
+size = Vector3(1.6, 0.5, 1.2)
+
+[sub_resource type="BoxMesh" id="Mesh_crystal_a"]
+material = SubResource("Mat_crystal_a")
+size = Vector3(0.22, 0.60, 0.18)
+
+[sub_resource type="BoxMesh" id="Mesh_crystal_b"]
+material = SubResource("Mat_crystal_b")
+size = Vector3(0.16, 0.80, 0.14)
+
+[sub_resource type="BoxMesh" id="Mesh_crystal_c"]
+material = SubResource("Mat_crystal_a")
+size = Vector3(0.13, 0.45, 0.12)
+
+[sub_resource type="BoxMesh" id="Mesh_crystal_d"]
+material = SubResource("Mat_crystal_b")
+size = Vector3(0.20, 0.55, 0.16)
+
+[sub_resource type="SphereMesh" id="Mesh_moss"]
+material = SubResource("Mat_moss")
+radius = 0.35
+height = 0.14
+
+[sub_resource type="BoxShape3D" id="Shape_area"]
+
+[sub_resource type="BoxShape3D" id="Shape_body"]
+size = Vector3(2.0, 1.2, 2.0)
+
+[node name="CrystalbackGrotto" type="Node3D" groups=["shelters"]]
+script = ExtResource("1_shelter")
+locked_species = "Crystalback"
+
+; Rock base — large rounded boulder cluster forming the grotto
+[node name="RockBase" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.4, 0, 0, 0, 0.65, 0, 0, 0, 1.3, 0, 0.29, 0)
+mesh = SubResource("Mesh_rock_base")
+
+; Flat overhanging slab (creates sheltered entrance)
+[node name="RockSlab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.54, -0.30)
+mesh = SubResource("Mesh_rock_slab")
+
+; Crystal cluster A — tallest, back-left
+[node name="CrystalA" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.866, -0.5, 0, 0.5, 0.866, 0, 0, 0, 1, -0.45, 0.55, 0.30)
+mesh = SubResource("Mesh_crystal_a")
+
+; Crystal cluster B — very tall, back-right
+[node name="CrystalB" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.940, 0, 0.342, 0, 1, 0, -0.342, 0, 0.940, 0.50, 0.60, 0.22)
+mesh = SubResource("Mesh_crystal_b")
+
+; Crystal cluster C — small, front-left
+[node name="CrystalC" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.985, 0, -0.174, 0, 1, 0, 0.174, 0, 0.985, -0.62, 0.40, -0.10)
+mesh = SubResource("Mesh_crystal_c")
+
+; Crystal cluster D — medium, right side
+[node name="CrystalD" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.940, -0.342, 0, 0.342, 0.940, 0.55, 0.50, 0.42)
+mesh = SubResource("Mesh_crystal_d")
+
+; Moss on rock
+[node name="Moss" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.4, 0, 0, 0, 0.25, 0, 0, 0, 1.2, -0.10, 0.52, 0.15)
+mesh = SubResource("Mesh_moss")
+
+[node name="ShelterLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 0)
+billboard = 1
+no_depth_test = true
+text = "Crystalback Grotto"
+font_size = 26
+
+[node name="ShelterArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShelterArea"]
+transform = Transform3D(3.2, 0, 0, 0, 2.0, 0, 0, 0, 3.2, 0, 1.0, 0)
+shape = SubResource("Shape_area")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("Shape_body")

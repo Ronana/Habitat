@@ -1,0 +1,171 @@
+[gd_scene format=3 uid="uid://emberowl001"]
+
+[ext_resource type="Script" path="res://scripts/emberowl.gd" id="1_eo"]
+
+; ── Materials ──────────────────────────────────────────────────────────────────
+[sub_resource type="StandardMaterial3D" id="Mat_feather"]
+albedo_color = Color(0.22, 0.18, 0.14, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Mat_pale"]
+albedo_color = Color(0.52, 0.46, 0.36, 1)
+roughness = 0.92
+
+[sub_resource type="StandardMaterial3D" id="Mat_beak"]
+albedo_color = Color(0.60, 0.48, 0.20, 1)
+roughness = 0.75
+
+[sub_resource type="StandardMaterial3D" id="Mat_eye"]
+albedo_color = Color(1.0, 0.55, 0.05, 1)
+roughness = 0.2
+emission_enabled = true
+emission = Color(1.0, 0.55, 0.05, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="Mat_talon"]
+albedo_color = Color(0.25, 0.20, 0.14, 1)
+roughness = 0.85
+
+; ── Meshes ─────────────────────────────────────────────────────────────────────
+[sub_resource type="SphereMesh" id="Mesh_body"]
+material = SubResource("Mat_feather")
+radius = 0.28
+height = 0.50
+
+[sub_resource type="SphereMesh" id="Mesh_head"]
+material = SubResource("Mat_feather")
+radius = 0.22
+height = 0.32
+
+[sub_resource type="SphereMesh" id="Mesh_belly"]
+material = SubResource("Mat_pale")
+radius = 0.22
+height = 0.30
+
+[sub_resource type="SphereMesh" id="Mesh_eye_disc"]
+material = SubResource("Mat_pale")
+radius = 0.09
+height = 0.04
+
+[sub_resource type="SphereMesh" id="Mesh_eye"]
+material = SubResource("Mat_eye")
+radius = 0.065
+height = 0.08
+
+[sub_resource type="CylinderMesh" id="Mesh_beak"]
+material = SubResource("Mat_beak")
+top_radius = 0.018
+bottom_radius = 0.030
+height = 0.07
+
+[sub_resource type="BoxMesh" id="Mesh_wing"]
+material = SubResource("Mat_feather")
+size = Vector3(0.22, 0.06, 0.30)
+
+[sub_resource type="CylinderMesh" id="Mesh_leg"]
+material = SubResource("Mat_talon")
+top_radius = 0.04
+bottom_radius = 0.03
+height = 0.18
+
+[sub_resource type="SphereMesh" id="Mesh_ear_tuft"]
+material = SubResource("Mat_feather")
+radius = 0.04
+height = 0.10
+
+[sub_resource type="SphereMesh" id="Mesh_tail_fan"]
+material = SubResource("Mat_pale")
+radius = 0.14
+height = 0.08
+
+; ── Collision ──────────────────────────────────────────────────────────────────
+[sub_resource type="CapsuleShape3D" id="Col"]
+radius = 0.30
+height = 0.80
+
+; ── Scene tree ─────────────────────────────────────────────────────────────────
+[node name="Emberowl" type="CharacterBody3D" groups=["roamers"]]
+floor_max_angle = 1.5707964
+floor_snap_length = 0.5
+script = ExtResource("1_eo")
+
+; Body — round puffed-up torso
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.1, 0, 0, 0, 1.0, 0, 0, 0, 1.0, 0, 0.35, 0)
+mesh = SubResource("Mesh_body")
+
+; Belly — pale front disc
+[node name="Belly" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9, 0, 0, 0, 0.55, 0, 0, 0, 0.35, 0, 0.28, -0.18)
+mesh = SubResource("Mesh_belly")
+
+; Head — large, sits directly on body
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.68, 0)
+mesh = SubResource("Mesh_head")
+
+; Ear tufts
+[node name="EarTuftL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1.8, 0, 0, 0, 1, -0.12, 0.90, 0)
+mesh = SubResource("Mesh_ear_tuft")
+
+[node name="EarTuftR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1.8, 0, 0, 0, 1, 0.12, 0.90, 0)
+mesh = SubResource("Mesh_ear_tuft")
+
+; Facial disc rings (pale) behind the glowing eyes
+[node name="FaceDiscL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.3, 0, 0, 0, 1, -0.095, 0.68, -0.18)
+mesh = SubResource("Mesh_eye_disc")
+
+[node name="FaceDiscR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.3, 0, 0, 0, 1, 0.095, 0.68, -0.18)
+mesh = SubResource("Mesh_eye_disc")
+
+; Eyes — glowing amber
+[node name="EyeL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.095, 0.68, -0.22)
+mesh = SubResource("Mesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.095, 0.68, -0.22)
+mesh = SubResource("Mesh_eye")
+
+; Beak — small hooked cone
+[node name="Beak" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, -0.28)
+mesh = SubResource("Mesh_beak")
+
+; Wings — flat angular stubs on each side
+[node name="WingL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36, 0.38, 0.02)
+mesh = SubResource("Mesh_wing")
+
+[node name="WingR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.36, 0.38, 0.02)
+mesh = SubResource("Mesh_wing")
+
+; Tail fan — behind body
+[node name="TailFan" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.2, 0, 0, 0, 0.35, 0, 0, 0, 0.9, 0, 0.22, 0.30)
+mesh = SubResource("Mesh_tail_fan")
+
+; Legs — two short taloned legs
+[node name="LegL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.14, 0.09, 0)
+mesh = SubResource("Mesh_leg")
+
+[node name="LegR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.14, 0.09, 0)
+mesh = SubResource("Mesh_leg")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.38, 0)
+shape = SubResource("Col")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+billboard = 1
+no_depth_test = true
+text = "Emberowl"
+font_size = 22

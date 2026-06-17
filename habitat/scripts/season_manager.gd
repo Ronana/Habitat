@@ -78,25 +78,20 @@ func _process(delta):
 
 func advance_day():
 	current_day += 1
-	emit_signal("day_passed", current_day)
-	print("📅 Day ", current_day, " of ", get_season_name())
+	day_passed.emit(current_day)
 	
 	if current_day > days_per_season:
 		current_day = 1
 		advance_season()
 
 func advance_season():
-	var next_season = (current_season + 1) % 4
-	current_season = next_season
-	emit_signal("season_changed", current_season)
+	current_season = ((int(current_season) + 1) % 4) as Season
+	season_changed.emit(current_season)
 	apply_season()
-	print("🌿 Season changed to: ", get_season_name())
-	WardenManager.gain_xp("roamer_appears")
+	WardenManager.gain_xp("season_advance")
 
 func apply_season():
-	print("apply_season called — season: ", get_season_name())
 	if not environment or not sun:
-		print("ERROR: Missing environment or sun reference")
 		return
 	var data = season_data[current_season]
 	

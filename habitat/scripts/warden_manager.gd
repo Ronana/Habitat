@@ -9,11 +9,13 @@ var xp_to_next_level: float = 100.0
 var xp_multiplier: float = 1.5
 
 # XP rewards for actions
-var xp_rewards = {
+var xp_rewards: Dictionary = {
 	"roamer_appears":    10.0,
 	"roamer_visits":     25.0,
 	"roamer_resident":   50.0,
 	"roamer_bonded":    100.0,
+	"roamer_interacted":  5.0,
+	"zone_unlocked":     50.0,
 	"roamer_fed":         2.0,
 	"roamer_bred":      150.0,
 	"egg_laid":         150.0,  # alias used by roamer_base
@@ -24,10 +26,12 @@ var xp_rewards = {
 	"terrain_shaped":     1.0,
 	"shelter_placed":    15.0,
 	"decor_placed":       3.0,
+	"season_advance":     5.0,
+	"item_purchased":      2.0,
 }
 
 # What unlocks at each level
-var level_unlocks = {
+var level_unlocks: Dictionary = {
 	2:  "Maren's shop expanded — Wildgrass Seeds available",
 	5:  "Terrain tool upgraded — larger radius",
 	10: "Old Cob the Tool Trader arrives",
@@ -39,47 +43,39 @@ var level_unlocks = {
 	50: "Elder variants begin appearing",
 }
 
-func gain_xp(action: String):
+func gain_xp(action: String) -> void:
 	if not xp_rewards.has(action):
-		print("Unknown action: ", action)
+		push_warning("WardenManager: unknown XP action '%s'" % action)
 		return
-	
-	var amount = xp_rewards[action]
+	var amount: float = xp_rewards[action]
 	current_xp += amount
-	emit_signal("xp_gained", amount, current_xp)
-	print("+", amount, " XP for ", action, " (Total: ", current_xp, "/", xp_to_next_level, ")")
-	
+	xp_gained.emit(amount, current_xp)
 	check_level_up()
 
-func check_level_up():
+func check_level_up() -> void:
 	while current_xp >= xp_to_next_level:
 		current_xp -= xp_to_next_level
 		current_level += 1
 		xp_to_next_level = round(xp_to_next_level * xp_multiplier)
-		emit_signal("level_up", current_level)
+		level_up.emit(current_level)
 		on_level_up(current_level)
 
-func on_level_up(new_level: int):
-	print("🌿 LEVEL UP! You are now Warden Level ", new_level)
-	if level_unlocks.has(new_level):
-		print("✨ Unlocked: ", level_unlocks[new_level])
+func on_level_up(_new_level: int) -> void:
+	pass
 
-# Returns which of the given shop_items array should be visible at the current level.
-# Items with no "min_level" key are always available.
+## Returns items visible to the player at the current warden level.
 func filter_shop_items(all_items: Array) -> Array:
-	var result = []
-	for item in all_items:
-		var min_lvl: int = item.get("min_level", 1)
-		if current_level >= min_lvl:
+	var result: Array = []
+	for item: Dictionary in all_items:
+		if current_level >= int(item.get("min_level", 1)):
 			result.append(item)
 	return result
 
-# Returns locked items for display purposes (so the player can see what's coming).
+## Returns items not yet unlocked — shown greyed out in the shop.
 func get_locked_shop_items(all_items: Array) -> Array:
-	var result = []
-	for item in all_items:
-		var min_lvl: int = item.get("min_level", 1)
-		if current_level < min_lvl:
+	var result: Array = []
+	for item: Dictionary in all_items:
+		if current_level < int(item.get("min_level", 1)):
 			result.append(item)
 	return result
 

@@ -1,4 +1,3 @@
-@tool
 extends Node3D
 
 @export var tree_scene: PackedScene
@@ -50,13 +49,33 @@ var species_requirements: Dictionary = {
 		"max_in_garden": 2,
 		"label": "🐢 Stoneback"
 	},
+	"Thornmouse": {
+		"scene": "res://creatures/thornmouse.tscn",
+		"min_food": 2,
+		"min_shelters": 0,
+		"min_avg_happiness": 0.3,
+		"max_in_garden": 5,
+		"label": "🐭 Thornmouse"
+	},
+	"Emberowl": {
+		"scene": "res://creatures/emberowl.tscn",
+		"min_food": 1,
+		"min_shelters": 1,
+		"min_avg_happiness": 0.45,
+		"max_in_garden": 3,
+		"label": "🦉 Emberowl"
+	},
+	"Crystalback": {
+		"scene": "res://creatures/crystalback.tscn",
+		"min_food": 1,
+		"min_shelters": 2,
+		"min_avg_happiness": 0.55,
+		"max_in_garden": 2,
+		"label": "💎 Crystalback"
+	},
 }
 
 func _ready():
-	if Engine.is_editor_hint():
-		create_boundary()
-		return
-
 	for i in range(1, 6):
 		var path := "res://Stylized Nature MegaKit[Standard]/glTF/CommonTree_%d.gltf" % i
 		var scene := load(path) as PackedScene
@@ -124,10 +143,19 @@ func _ready():
 		var pause_menu := pause_scene.instantiate()
 		add_child(pause_menu)
 
+	# Zone expansion signal
+	ZoneManager.zone_unlocked.connect(_on_zone_unlocked)
+
+	# Register garden with TorvaldManager so Torvald spawns as our child
+	TorvaldManager.register_garden(self)
+	GusManager.register_garden(self)
+	DocBirtleManager.register_garden(self)
+
 	# Try to load save
-	var loaded = await SaveManager.load_game(self)
-	if not loaded:
-		print("Fresh wilderness — no save found")
+	await SaveManager.load_game(self)
+
+	# Zone markers depend on loaded zone state — placed after save load
+	_create_zone_markers()
 
 	# Show tutorial on first launch (after a short delay so the scene settles)
 	await get_tree().create_timer(1.2).timeout
@@ -155,22 +183,22 @@ func _input(event):
 			SeasonManager.current_season = SeasonManager.Season.SPRING
 			SeasonManager.apply_season()
 			WeatherManager.apply_weather_effects()
-			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
+			SeasonManager.season_changed.emit(SeasonManager.current_season)
 		if event.keycode == KEY_F2:
 			SeasonManager.current_season = SeasonManager.Season.SUMMER
 			SeasonManager.apply_season()
 			WeatherManager.apply_weather_effects()
-			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
+			SeasonManager.season_changed.emit(SeasonManager.current_season)
 		if event.keycode == KEY_F3:
 			SeasonManager.current_season = SeasonManager.Season.AUTUMN
 			SeasonManager.apply_season()
 			WeatherManager.apply_weather_effects()
-			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
+			SeasonManager.season_changed.emit(SeasonManager.current_season)
 		if event.keycode == KEY_F4:
 			SeasonManager.current_season = SeasonManager.Season.WINTER
 			SeasonManager.apply_season()
 			WeatherManager.apply_weather_effects()
-			SeasonManager.emit_signal("season_changed", SeasonManager.current_season)
+			SeasonManager.season_changed.emit(SeasonManager.current_season)
 
 func scatter_trees() -> void:
 	if _tree_scenes.is_empty():
@@ -196,63 +224,36 @@ func scatter_trees() -> void:
 
 
 func create_boundary():
-	var is_editor := Engine.is_editor_hint()
+	_build_boundary(ZoneManager.get_garden_half())
 
-	# Runtime: flat rune-glyph strips that glow orange on the ground.
-	# Editor: tall bright orange posts so the boundary is clearly visible in the viewport.
-	var half  := starter_area_size / 2.0
-	var seg   := 2.0
-	var count := int(starter_area_size / seg)
+func _build_boundary(half: float) -> void:
+	# Flat rune-glyph strips that glow orange on the ground.
+	var seg      := 2.0
+	var count    := int(half * 2.0 / seg)
+	var rune_shader := load("res://shaders/boundary_rune.gdshader") as Shader
+	var rune_mat := ShaderMaterial.new()
+	rune_mat.shader = rune_shader
+	var strip_w  := 0.9
+	for i in range(count):
+		var along: float = -half + (float(i) + 0.5) * seg
+		_add_boundary_segment(Vector3(along, 0.02, -half), Vector3(seg, strip_w, 0.0), rune_mat, "x")
+		_add_boundary_segment(Vector3(along, 0.02,  half), Vector3(seg, strip_w, 0.0), rune_mat, "x")
+		_add_boundary_segment(Vector3(-half, 0.02, along), Vector3(seg, strip_w, 0.0), rune_mat, "z")
+		_add_boundary_segment(Vector3( half, 0.02, along), Vector3(seg, strip_w, 0.0), rune_mat, "z")
 
-	if is_editor:
-		# Simple tall orange posts for editor visibility
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_color = Color(1.0, 0.55, 0.05, 1.0)
-		for i in range(count):
-			var along: float = -half + (float(i) + 0.5) * seg
-			_add_boundary_segment(Vector3(along, 0.75, -half), Vector3(seg, 1.5, 0.15), mat, "x", true)
-			_add_boundary_segment(Vector3(along, 0.75,  half), Vector3(seg, 1.5, 0.15), mat, "x", true)
-			_add_boundary_segment(Vector3(-half, 0.75, along), Vector3(0.15, 1.5, seg), mat, "z", true)
-			_add_boundary_segment(Vector3( half, 0.75, along), Vector3(0.15, 1.5, seg), mat, "z", true)
-	else:
-		# Load the rune shader once and share it across all strip segments
-		var rune_shader := load("res://shaders/boundary_rune.gdshader") as Shader
-		var rune_mat := ShaderMaterial.new()
-		rune_mat.shader = rune_shader
-		# Strip is 0.9 m wide — same size for every segment so UVs tile consistently
-		var strip_w := 0.9
-		for i in range(count):
-			var along: float = -half + (float(i) + 0.5) * seg
-			# All segments use Vector2(seg, strip_w); Z-axis segments are rotated 90° in _add_boundary_segment
-			_add_boundary_segment(Vector3(along, 0.02, -half), Vector3(seg, strip_w, 0.0), rune_mat, "x", false)
-			_add_boundary_segment(Vector3(along, 0.02,  half), Vector3(seg, strip_w, 0.0), rune_mat, "x", false)
-			_add_boundary_segment(Vector3(-half, 0.02, along), Vector3(seg, strip_w, 0.0), rune_mat, "z", false)
-			_add_boundary_segment(Vector3( half, 0.02, along), Vector3(seg, strip_w, 0.0), rune_mat, "z", false)
-
-func _add_boundary_segment(pos: Vector3, size: Vector3, mat: Material, run_axis: String, use_box: bool) -> void:
-	var mi := MeshInstance3D.new()
-	if use_box:
-		var bm  := BoxMesh.new()
-		bm.size  = size
-		mi.mesh  = bm
-	else:
-		# Flat PlaneMesh — UV.x always runs along the long axis (strip length).
-		# Z-axis segments are rotated 90° around Y so their long axis aligns with Z
-		# and the rune shader tiles correctly along the strip.
-		var pm  := PlaneMesh.new()
-		pm.size  = Vector2(size.x, size.y)
-		mi.mesh  = pm
-		if run_axis == "z":
-			mi.rotation_degrees.y = 90.0
+func _add_boundary_segment(pos: Vector3, size: Vector3, mat: Material, run_axis: String) -> void:
+	var mi  := MeshInstance3D.new()
+	var pm  := PlaneMesh.new()
+	pm.size  = Vector2(size.x, size.y)
+	mi.mesh  = pm
+	if run_axis == "z":
+		mi.rotation_degrees.y = 90.0
 	mi.position = pos
 	mi.set_meta("run_axis", run_axis)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.set_surface_override_material(0, mat)
 	mi.add_to_group("boundary_lines")
 	add_child(mi)
-	if Engine.is_editor_hint() and get_tree():
-		mi.owner = get_tree().edited_scene_root
 
 func _setup_sky(env: Environment) -> void:
 	var sky_shader := load("res://GodotSkiesShaders/main.gdshader") as Shader
@@ -388,12 +389,12 @@ func _scatter_outer_decorations() -> void:
 	# ── Fallen logs ─────────────────────────────────────────────────────────────
 	for _i in range(65):
 		var xz := _outer_annular_pos(28.0, 185.0)
-		var tr: float = randf_range(0.22, 0.52)
+		var trunk_r: float = randf_range(0.22, 0.52)
 		var ty: float = _terrain_y(xz.x, xz.y)
 		var mi  := MeshInstance3D.new()
 		var cm  := CylinderMesh.new()
-		cm.top_radius    = tr
-		cm.bottom_radius = tr * randf_range(0.85, 1.10)
+		cm.top_radius    = trunk_r
+		cm.bottom_radius = trunk_r * randf_range(0.85, 1.10)
 		cm.height        = randf_range(1.8, 5.5)
 		cm.radial_segments = 8
 		mi.mesh = cm
@@ -402,7 +403,7 @@ func _scatter_outer_decorations() -> void:
 		mi.visibility_range_end       = 120.0
 		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 		mi.rotation = Vector3(0.0, randf() * TAU, PI * 0.5)
-		mi.position = Vector3(xz.x, ty + tr, xz.y)
+		mi.position = Vector3(xz.x, ty + trunk_r, xz.y)
 		add_child(mi)
 
 	# ── Mushroom clusters ────────────────────────────────────────────────────────
@@ -648,8 +649,6 @@ func give_starting_inventory():
 var _boundary_timer: float = 0.0
 
 func _process(delta):
-	if Engine.is_editor_hint():
-		return
 	_boundary_timer += delta
 	if _boundary_timer >= 0.2:
 		_boundary_timer = 0.0
@@ -692,76 +691,69 @@ func _tick_attraction(delta: float):
 	_check_wild_attractions()
 
 func _check_wild_attractions():
-	var food_count = get_tree().get_nodes_in_group("food").size()
-	var shelter_count = get_tree().get_nodes_in_group("shelters").size()
-	var roamers = get_tree().get_nodes_in_group("roamers")
-
-	# Average happiness across all current roamers (0.5 if none yet)
-	var avg_happiness := 0.5
-	if roamers.size() > 0:
-		var total := 0.0
-		for r in roamers:
-			total += r.happiness
-		avg_happiness = total / roamers.size()
-
-	for species_id in species_requirements:
-		var req = species_requirements[species_id]
-
+	for species_id in AttractionManager.SPECIES:
 		# Still on cooldown?
 		if attraction_cooldowns.has(species_id):
 			continue
 
 		# Already at population cap?
-		var count := 0
-		for r in roamers:
-			if r.species_id == species_id:
-				count += 1
-		if count >= req["max_in_garden"]:
+		if AttractionManager.is_at_cap(species_id):
 			continue
 
-		# Check requirements
-		if food_count < req["min_food"]:
-			continue
-		if shelter_count < req["min_shelters"]:
-			continue
-		if avg_happiness < req["min_avg_happiness"]:
+		# Visit requirements (food, lighting, decoratives, etc.)
+		if not AttractionManager.can_visit(species_id):
 			continue
 
 		# All requirements met — attract one!
+		var req: Dictionary = AttractionManager.SPECIES[species_id]
 		_spawn_wild_roamer(species_id, req)
-		attraction_cooldowns[species_id] = ATTRACTION_COOLDOWN
+		attraction_cooldowns[species_id] = ATTRACTION_COOLDOWN * GusManager.visit_interval_mult()
 		break  # one spawn per check cycle
 
-func _spawn_wild_roamer(species_id: String, req: Dictionary):
+func _spawn_wild_roamer(_species_id: String, req: Dictionary):
 	var scene = load(req["scene"])
 	if not scene:
 		return
 
 	var roamer = scene.instantiate()
 	var spawn_pos = _get_boundary_spawn_pos()
-	# Stamp species before add_child so _ready() doesn't need to do it
 	add_child(roamer)
 	roamer.global_position = spawn_pos
 
-	# Send it walking toward the garden centre so it naturally enters
-	var centre_target = Vector3(
-		randf_range(-8.0, 8.0),
+	# ── Peek-and-enter: linger near boundary first, then drift inward ────────
+	# Phase 1: wander laterally along the boundary edge (peek behaviour).
+	var half: float = ZoneManager.get_garden_half()
+	var edge_target := Vector3(
+		clamp(spawn_pos.x + randf_range(-6.0, 6.0), -half - 1.0, half + 1.0),
 		spawn_pos.y,
-		randf_range(-8.0, 8.0)
+		clamp(spawn_pos.z + randf_range(-6.0, 6.0), -half - 1.0, half + 1.0)
 	)
-	roamer.wander_target = centre_target
-	roamer.wander_timer = 30.0
+	roamer.wander_target = edge_target
+	roamer.wander_timer  = randf_range(4.0, 8.0)
 
-	_show_attraction_popup(spawn_pos, req["label"] + " is visiting!")
+	# Phase 2: after the peek delay, send it properly into the garden.
+	var peek_delay := randf_range(3.5, 6.5)
+	get_tree().create_timer(peek_delay).timeout.connect(func() -> void:
+		if not is_instance_valid(roamer):
+			return
+		var centre_target := Vector3(
+			randf_range(-8.0, 8.0),
+			roamer.global_position.y,
+			randf_range(-8.0, 8.0)
+		)
+		roamer.wander_target = centre_target
+		roamer.wander_timer  = 30.0
+	)
+
+	_show_attraction_popup(spawn_pos, _species_id + " is visiting!")
 	WardenManager.gain_xp("roamer_appears")
-	print("Wild ", species_id, " attracted to the garden!")
 
 func _get_boundary_spawn_pos() -> Vector3:
-	var half = starter_area_size / 2.0
+	var half: float = ZoneManager.get_garden_half()
 	# Pick a random edge and a random point along it, just outside the boundary
-	var edge = randi() % 4
-	var x: float; var z: float
-	match edge:
+	var x: float = 0.0
+	var z: float = 0.0
+	match randi() % 4:
 		0: x = randf_range(-half, half); z = -(half + 1.5)
 		1: x = randf_range(-half, half); z =   half + 1.5
 		2: x = -(half + 1.5);           z = randf_range(-half, half)
@@ -833,7 +825,7 @@ func get_objective_hint() -> String:
 	if not appears_unhappy.is_empty():
 		return "💛 " + appears_unhappy[0] + " is exploring — keep happiness above 50" + "%" + " to earn their trust."
 	if not visits_no_shelter.is_empty():
-		return "🏠 " + visits_no_shelter[0] + " needs a shelter to become a Resident — buy one from Maren."
+		return "🏠 " + visits_no_shelter[0] + " needs a shelter to become a Resident — buy one from Sam."
 	if not visits_low_happy.is_empty():
 		return "💛 " + visits_low_happy[0] + " needs happiness above 70" + "%" + " to settle in — feed them."
 	if not resident_low_happy.is_empty():
@@ -843,42 +835,224 @@ func get_objective_hint() -> String:
 	if bonded == 1:
 		return "🌟 One Roamer is Bonded! Bond another to unlock breeding."
 	if shelter_count == 0 and roamers.size() > 0:
-		return "🏠 No shelters yet — buy a Basic Shelter from Maren and place it."
+		return "🏠 No shelters yet — buy a species den from Sam and place it."
 	return "✨ Garden is thriving! Attract more wild Roamers to grow your habitat."
 
 func get_attraction_hints() -> Array:
-	var hints = []
-	var food_count = get_tree().get_nodes_in_group("food").size()
-	var shelter_count = get_tree().get_nodes_in_group("shelters").size()
-	var roamers = get_tree().get_nodes_in_group("roamers")
-	var avg_happiness := 0.5
-	if roamers.size() > 0:
-		var total := 0.0
-		for r in roamers:
-			total += r.happiness
-		avg_happiness = total / roamers.size()
-
-	for species_id in species_requirements:
-		var req = species_requirements[species_id]
-		var count := 0
-		for r in roamers:
-			if r.species_id == species_id:
-				count += 1
-		if count >= req["max_in_garden"]:
-			hints.append(req["label"] + ": garden full")
+	var hints := []
+	for species_id in AttractionManager.SPECIES:
+		var data: Dictionary = AttractionManager.SPECIES[species_id]
+		var icon: String = data.get("icon", "")
+		if AttractionManager.is_at_cap(species_id):
+			hints.append(icon + " " + species_id + ": garden full")
 			continue
 		if attraction_cooldowns.has(species_id):
-			hints.append(req["label"] + ": on their way... ✨")
+			hints.append(icon + " " + species_id + ": on their way... ✨")
 			continue
-		var parts := []
-		if food_count < req["min_food"]:
-			parts.append(str(food_count) + "/" + str(req["min_food"]) + " food")
-		if shelter_count < req["min_shelters"]:
-			parts.append(str(shelter_count) + "/" + str(req["min_shelters"]) + " shelter")
-		if avg_happiness < req["min_avg_happiness"]:
-			parts.append("happiness too low")
-		if parts.is_empty():
-			hints.append(req["label"] + ": requirements met ✓")
+		var unmet := []
+		for req_status in AttractionManager.get_visit_status(species_id):
+			if not req_status["met"]:
+				unmet.append(req_status["label"])
+		if unmet.is_empty():
+			hints.append(icon + " " + species_id + ": requirements met ✓")
 		else:
-			hints.append(req["label"] + ": needs " + ", ".join(parts))
+			hints.append(icon + " " + species_id + ": needs " + ", ".join(unmet))
 	return hints
+
+# ------------------------
+# ---------------------------------------------------------------------------
+# Zone expansion
+# ---------------------------------------------------------------------------
+
+func _create_zone_markers() -> void:
+	# Remove any existing zone markers first
+	for node in get_tree().get_nodes_in_group("zone_markers"):
+		node.queue_free()
+	# Nothing to mark when already at max zone
+	if ZoneManager.is_max_zone():
+		return
+	var next := ZoneManager.get_next_zone()
+	var h: float = float(next["half"])
+	# Place a glowing marker on each of the four walls at the midpoint
+	var positions := [
+		Vector3( h, 0.0,  0.0),
+		Vector3(-h, 0.0,  0.0),
+		Vector3( 0.0, 0.0,  h),
+		Vector3( 0.0, 0.0, -h),
+	]
+	for pos in positions:
+		var body := StaticBody3D.new()
+		body.add_to_group("zone_markers")
+		body.set_meta("zone_name", next["name"])
+		body.set_meta("zone_cost", next["cost"])
+		# Visual
+		var mi := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.45
+		sm.height = 0.90
+		mi.mesh = sm
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.emission_enabled = true
+		mat.emission = Color(0.6, 0.85, 1.0)
+		mat.emission_energy_multiplier = 2.5
+		mat.albedo_color = Color(0.6, 0.85, 1.0, 0.9)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mi.set_surface_override_material(0, mat)
+		body.add_child(mi)
+		# Floating label
+		var lbl := Label3D.new()
+		lbl.text = "🔒 %s\n💧 %d" % [next["name"], next["cost"]]
+		lbl.font_size = 48
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.no_depth_test = true
+		lbl.position = Vector3(0, 1.6, 0)
+		body.add_child(lbl)
+		# Collision
+		var col := CollisionShape3D.new()
+		var sp := SphereShape3D.new()
+		sp.radius = 0.7
+		col.shape = sp
+		body.add_child(col)
+		# Snap to terrain
+		var ty := _terrain_y(pos.x, pos.z, 0.0)
+		body.position = Vector3(pos.x, ty + 0.5, pos.z)
+		add_child(body)
+
+func _on_zone_unlocked(_zone_index: int) -> void:
+	# Rebuild boundary to new size and refresh markers
+	for node in get_tree().get_nodes_in_group("boundary_lines"):
+		node.queue_free()
+	create_boundary()
+	_create_zone_markers()
+	# Deep Pockets upgrade: bonus dewdrops on zone unlock
+	if GusManager.has_upgrade(GusManager.UPGRADE_DEEP_POCKETS):
+		CurrencyManager.add_dewdrops(50.0)
+
+func show_zone_unlock_popup() -> void:
+	if ZoneManager.is_max_zone():
+		return
+	var next := ZoneManager.get_next_zone()
+	var cost: int = int(next["cost"])
+	if not ZoneManager.can_unlock_next():
+		_show_attraction_popup(Vector3.ZERO, "🔒 Need %d 💧 to expand — need more Dewdrops!" % cost)
+		return
+	# Show confirmation dialog before spending
+	_show_zone_confirm_dialog(next)
+
+func _show_zone_confirm_dialog(next: Dictionary) -> void:
+	var cost: int = int(next["cost"])
+	# ── Custom styled overlay matching the game UI ────────────────────────
+	var overlay := ColorRect.new()
+	overlay.color = Color(0.0, 0.0, 0.0, 0.55)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(360, 0)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color      = Color(0.04, 0.01, 0.09, 0.97)
+	panel_style.border_color  = Color(0.55, 0.20, 0.80, 1.0)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(12)
+	panel_style.shadow_color  = Color(0.0, 0.0, 0.0, 0.6)
+	panel_style.shadow_size   = 8
+	panel.add_theme_stylebox_override("panel", panel_style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	vbox.set("theme_override_constants/margin_left",   20)
+	vbox.set("theme_override_constants/margin_right",  20)
+	vbox.set("theme_override_constants/margin_top",    18)
+	vbox.set("theme_override_constants/margin_bottom", 18)
+	panel.add_child(vbox)
+
+	# Title
+	var title_lbl := Label.new()
+	title_lbl.text = "🌳 Expand Your Garden?"
+	title_lbl.add_theme_font_size_override("font_size", 20)
+	title_lbl.add_theme_color_override("font_color", Color(0.78, 0.38, 0.96, 1.0))
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title_lbl)
+
+	# Divider
+	var div := HSeparator.new()
+	var div_style := StyleBoxFlat.new()
+	div_style.bg_color = Color(0.55, 0.20, 0.80, 0.4)
+	div_style.set_content_margin_all(0)
+	div.add_theme_stylebox_override("separator", div_style)
+	vbox.add_child(div)
+
+	# Zone name + cost
+	var zone_lbl := Label.new()
+	zone_lbl.text = "Unlock  %s  for  %d 💧" % [next["name"], cost]
+	zone_lbl.add_theme_font_size_override("font_size", 16)
+	zone_lbl.add_theme_color_override("font_color", Color(0.93, 0.91, 0.96, 1.0))
+	zone_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(zone_lbl)
+
+	# Description
+	var desc_lbl := Label.new()
+	desc_lbl.text = "Your garden boundary will grow\nand new areas will open for exploration."
+	desc_lbl.add_theme_font_size_override("font_size", 13)
+	desc_lbl.add_theme_color_override("font_color", Color(0.65, 0.62, 0.72, 1.0))
+	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(desc_lbl)
+
+	# Button row
+	var hbox := HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("separation", 12)
+	vbox.add_child(hbox)
+
+	var btn_cancel := Button.new()
+	btn_cancel.text = "Not yet"
+	btn_cancel.custom_minimum_size = Vector2(110, 36)
+	var sty_cancel := StyleBoxFlat.new()
+	sty_cancel.bg_color = Color(0.10, 0.03, 0.20, 1.0)
+	sty_cancel.border_color = Color(0.30, 0.10, 0.50, 1.0)
+	sty_cancel.set_border_width_all(1)
+	sty_cancel.set_corner_radius_all(6)
+	btn_cancel.add_theme_stylebox_override("normal",  sty_cancel)
+	btn_cancel.add_theme_stylebox_override("hover",   sty_cancel)
+	btn_cancel.add_theme_stylebox_override("pressed", sty_cancel)
+	btn_cancel.add_theme_color_override("font_color", Color(0.70, 0.67, 0.78, 1.0))
+	hbox.add_child(btn_cancel)
+
+	var btn_ok := Button.new()
+	btn_ok.text = "Unlock  (%d 💧)" % cost
+	btn_ok.custom_minimum_size = Vector2(150, 36)
+	var sty_ok := StyleBoxFlat.new()
+	sty_ok.bg_color = Color(0.28, 0.06, 0.52, 1.0)
+	sty_ok.border_color = Color(0.78, 0.38, 0.96, 1.0)
+	sty_ok.set_border_width_all(2)
+	sty_ok.set_corner_radius_all(6)
+	btn_ok.add_theme_stylebox_override("normal",  sty_ok)
+	btn_ok.add_theme_stylebox_override("hover",   sty_ok)
+	btn_ok.add_theme_stylebox_override("pressed", sty_ok)
+	btn_ok.add_theme_color_override("font_color", Color(0.93, 0.91, 0.96, 1.0))
+	hbox.add_child(btn_ok)
+
+	# Wire up
+	var canvas := CanvasLayer.new()
+	canvas.add_child(overlay)
+	canvas.add_child(panel)
+	add_child(canvas)
+
+	# Centre panel on screen after one frame so size is known
+	await get_tree().process_frame
+	var vp := get_viewport().get_visible_rect().size
+	panel.position = (vp - panel.size) * 0.5
+
+	btn_cancel.pressed.connect(canvas.queue_free)
+	btn_ok.pressed.connect(func():
+		if ZoneManager.can_unlock_next():
+			ZoneManager.unlock_next()
+			WardenManager.gain_xp("zone_unlocked")
+			_on_zone_unlocked(ZoneManager.current_zone)
+			_show_attraction_popup(Vector3.ZERO,
+				"🌳 %s unlocked! Your garden has grown!" % next["name"])
+		canvas.queue_free()
+	)

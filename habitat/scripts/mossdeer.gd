@@ -8,12 +8,13 @@ func _ready():
 	hunger_threshold       = 0.5
 	need_decay["food"]     = 0.015
 	food_seek_interval     = 3.5   # checks for food more often — it's a grazer
+	_selection_color       = Color(0.30, 0.88, 0.42)  # mossy green
 	super._ready()
 
 # ── Wander — large range, biased toward trees or food ────────────────────────
 
 func pick_wander_target():
-	var half_area := 19.0
+	var half_area: float = ZoneManager.get_garden_half() - 1.0
 	# 35 % chance: drift toward nearest tree (grazes in shade)
 	if randf() < 0.35:
 		var trees := get_tree().get_nodes_in_group("trees")
@@ -86,9 +87,3 @@ func _do_graze_anim():
 	t.tween_property(body, "position:y", _body_rest_y - 0.06, 0.35)
 	t.tween_property(body, "position:y", _body_rest_y,         0.40)
 	t.tween_callback(_start_idle_bob)
-
-func on_selected():
-	super.on_selected()
-
-func on_deselected():
-	super.on_deselected()

@@ -12,12 +12,13 @@ func _ready():
 	hunger_threshold       = 0.4
 	need_decay["food"]     = 0.007        # barely gets hungry
 	need_decay["safety"]   = 0.002        # stone shell = naturally safe
+	_selection_color       = Color(0.50, 0.72, 0.95)  # cool slate blue
 	super._ready()
 
 # ── Wander — very short range, always pauses on arrival ──────────────────────
 
 func pick_wander_target():
-	var half_area := 19.0
+	var half_area: float = ZoneManager.get_garden_half() - 1.0
 	var wander_range := 8.0
 	var t := global_position + Vector3(
 		randf_range(-wander_range, wander_range), 0.0, randf_range(-wander_range, wander_range))
@@ -81,8 +82,3 @@ func _exit_shell():
 	var tween := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "scale", Vector3(1.0, 1.0, 1.0), 0.45)
 
-func on_selected():
-	super.on_selected()
-
-func on_deselected():
-	super.on_deselected()

@@ -1,0 +1,60 @@
+[gd_scene format=3 uid="uid://stoneback_cave"]
+
+[ext_resource type="Script" path="res://scripts/shelter.gd" id="1_shelter"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.28, 0.26, 0.22, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_walls"]
+albedo_color = Color(0.44, 0.42, 0.38, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_dome"]
+albedo_color = Color(0.36, 0.34, 0.30, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_floor"]
+
+[sub_resource type="BoxMesh" id="Mesh_walls"]
+
+[sub_resource type="SphereMesh" id="Mesh_dome"]
+
+[sub_resource type="BoxShape3D" id="Shape_area"]
+
+[sub_resource type="BoxShape3D" id="Shape_body"]
+
+[node name="StonebackCave" type="Node3D"]
+script = ExtResource("1_shelter")
+locked_species = "Stoneback"
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+transform = Transform3D(2.4, 0, 0, 0, 0.15, 0, 0, 0, 2.4, 0, 0.075, 0)
+material_overlay = SubResource("Mat_floor")
+mesh = SubResource("Mesh_floor")
+
+[node name="Walls" type="MeshInstance3D" parent="."]
+transform = Transform3D(2.2, 0, 0, 0, 1.6, 0, 0, 0, 2.2, 0, 0.95, 0)
+material_overlay = SubResource("Mat_walls")
+mesh = SubResource("Mesh_walls")
+
+[node name="Dome" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.4, 0, 0, 0, 1.0, 0, 0, 0, 1.4, 0, 2.25, 0)
+material_overlay = SubResource("Mat_dome")
+mesh = SubResource("Mesh_dome")
+
+[node name="ShelterLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.4, 0)
+billboard = 1
+no_depth_test = true
+text = "Stoneback Cave"
+font_size = 28
+
+[node name="ShelterArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShelterArea"]
+transform = Transform3D(3.2, 0, 0, 0, 2.0, 0, 0, 0, 3.2, 0, 1.0, 0)
+shape = SubResource("Shape_area")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(2.2, 0, 0, 0, 2.0, 0, 0, 0, 2.2, 0, 1.0, 0)
+shape = SubResource("Shape_body")

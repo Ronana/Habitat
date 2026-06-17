@@ -7,8 +7,9 @@ signal tool_selected(tool_id: String)
 
 # ── Tool definitions ──────────────────────────────────────────────────────────
 const TOOLS: Array = [
-	{"id": "hand",   "name": "Hand",   "letter": "H", "col": Color(0.60, 0.62, 0.65)},
-	{"id": "shovel", "name": "Shovel", "letter": "S", "col": Color(0.78, 0.55, 0.12)},
+	{"id": "hand",         "name": "Hand",         "letter": "H", "col": Color(0.60, 0.62, 0.65)},
+	{"id": "shovel",       "name": "Shovel",       "letter": "S", "col": Color(0.78, 0.55, 0.12)},
+	{"id": "watering_can", "name": "Watering Can", "letter": "W", "col": Color(0.25, 0.65, 0.90)},
 ]
 
 # ── Layout constants ──────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ func _ready() -> void:
 	_build_ui()
 
 func _build_ui() -> void:
-	var vp_size := Vector2(1152, 648)   # safe fallback; updated on open
+	var _vp_size := Vector2(1152, 648)   # safe fallback; updated on open
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP

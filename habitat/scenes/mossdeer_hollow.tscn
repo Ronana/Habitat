@@ -1,0 +1,60 @@
+[gd_scene format=3 uid="uid://mossdeer_hollow"]
+
+[ext_resource type="Script" path="res://scripts/shelter.gd" id="1_shelter"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.18, 0.12, 0.06, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_walls"]
+albedo_color = Color(0.38, 0.26, 0.12, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_roof"]
+albedo_color = Color(0.16, 0.40, 0.10, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_floor"]
+
+[sub_resource type="BoxMesh" id="Mesh_walls"]
+
+[sub_resource type="PrismMesh" id="Mesh_roof"]
+
+[sub_resource type="BoxShape3D" id="Shape_area"]
+
+[sub_resource type="BoxShape3D" id="Shape_body"]
+
+[node name="MossDeerHollow" type="Node3D"]
+script = ExtResource("1_shelter")
+locked_species = "Mossdeer"
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+transform = Transform3D(2.8, 0, 0, 0, 0.15, 0, 0, 0, 2.8, 0, 0.075, 0)
+material_overlay = SubResource("Mat_floor")
+mesh = SubResource("Mesh_floor")
+
+[node name="Walls" type="MeshInstance3D" parent="."]
+transform = Transform3D(2.6, 0, 0, 0, 2.2, 0, 0, 0, 2.6, 0, 1.25, 0)
+material_overlay = SubResource("Mat_walls")
+mesh = SubResource("Mesh_walls")
+
+[node name="Roof" type="MeshInstance3D" parent="."]
+transform = Transform3D(3.0, 0, 0, 0, 1.2, 0, 0, 0, 3.0, 0, 3.0, 0)
+material_overlay = SubResource("Mat_roof")
+mesh = SubResource("Mesh_roof")
+
+[node name="ShelterLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.0, 0)
+billboard = 1
+no_depth_test = true
+text = "MossDeer Hollow"
+font_size = 28
+
+[node name="ShelterArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ShelterArea"]
+transform = Transform3D(3.8, 0, 0, 0, 2.0, 0, 0, 0, 3.8, 0, 1.2, 0)
+shape = SubResource("Shape_area")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(2.6, 0, 0, 0, 2.4, 0, 0, 0, 2.6, 0, 1.2, 0)
+shape = SubResource("Shape_body")

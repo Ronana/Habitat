@@ -11,5 +11,4 @@ func fire(key: String, title: String, subtitle: String):
 	if achieved.has(key):
 		return
 	achieved[key] = true
-	emit_signal("milestone_achieved", title, subtitle)
-	print("🏆 Milestone: ", title)
+	milestone_achieved.emit(title, subtitle)

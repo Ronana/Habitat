@@ -48,18 +48,18 @@ func _process(delta: float) -> void:
 
 func _apply_mats_to_blades() -> void:
 	# A-material (dark): blades 1, 3, 5
-	for name: String in ["Blade1", "Blade3", "Blade5"]:
-		var node: MeshInstance3D = get_node_or_null(name) as MeshInstance3D
+	for blade_name: String in ["Blade1", "Blade3", "Blade5"]:
+		var node: MeshInstance3D = get_node_or_null(blade_name) as MeshInstance3D
 		if node and _mat_a:
 			node.set_surface_override_material(0, _mat_a)
 	# B-material (bright): blades 2, 4, 7
-	for name: String in ["Blade2", "Blade4", "Blade7"]:
-		var node: MeshInstance3D = get_node_or_null(name) as MeshInstance3D
+	for blade_name: String in ["Blade2", "Blade4", "Blade7"]:
+		var node: MeshInstance3D = get_node_or_null(blade_name) as MeshInstance3D
 		if node and _mat_b:
 			node.set_surface_override_material(0, _mat_b)
 	# C-material (mid): blades 6, 8
-	for name: String in ["Blade6", "Blade8"]:
-		var node: MeshInstance3D = get_node_or_null(name) as MeshInstance3D
+	for blade_name: String in ["Blade6", "Blade8"]:
+		var node: MeshInstance3D = get_node_or_null(blade_name) as MeshInstance3D
 		if node and _mat_c:
 			node.set_surface_override_material(0, _mat_c)
 

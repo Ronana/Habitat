@@ -15,7 +15,7 @@ func _process(delta: float) -> void:
 		var new_score := compute_score()
 		if new_score != current_score:
 			current_score = new_score
-			emit_signal("score_changed", current_score)
+			score_changed.emit(current_score)
 
 func compute_score() -> int:
 	var tree := get_tree()

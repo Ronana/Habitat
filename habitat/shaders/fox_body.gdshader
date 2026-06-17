@@ -19,11 +19,11 @@ void fragment() {
 	// Blend base colour with sheen based on reflection angle
 	vec3 col = mix(base_colour.rgb, sheen_colour.rgb, irid * sheen_strength);
 
-	// Selection highlight — warm orange rim
-	col = mix(col, vec3(1.0, 0.6, 0.1), selection_highlight);
+	// Selection highlight — soft pink-purple matching the fox's own palette
+	col = mix(col, vec3(0.92, 0.42, 0.82), selection_highlight * 0.55);
 
 	ALBEDO     = col;
-	EMISSION   = vec3(1.0, 0.55, 0.05) * selection_highlight * 2.0;
+	EMISSION   = vec3(0.88, 0.32, 0.78) * selection_highlight * 1.0;
 	ROUGHNESS  = roughness;
 	SPECULAR   = specular;
 	METALLIC   = 0.0;

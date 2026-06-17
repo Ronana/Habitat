@@ -17,8 +17,30 @@ const SEASON_COLOURS = {
 	3: [Color(0.28, 0.24, 0.18, 1), Color(0.30, 0.26, 0.22, 1)],  # Winter — bare grey-brown
 }
 
+var _growth: Node = null
+
 func _ready():
 	add_to_group("food")
+	add_to_group("placeable_items")
+	# Hardy Stock upgrade — bush sustains more eats before depleting
+	if GusManager.has_upgrade(GusManager.UPGRADE_HARDY_STOCK):
+		max_eats = roundi(max_eats / GusManager.bush_depletion_mult())
+	# Click/selection body — lets raycast hit this item
+	var _cb := StaticBody3D.new()
+	var _cs := CollisionShape3D.new()
+	var _sp := SphereShape3D.new()
+	_sp.radius = 1.1
+	_cs.shape  = _sp
+	_cb.add_child(_cs)
+	add_child(_cb)
+	# Plant growth component
+	_growth = load("res://scripts/plant_growth.gd").new()
+	_growth.name = "PlantGrowth"
+	add_child(_growth)
+	_growth.stage_changed.connect(_on_growth_stage_changed)
+	_growth.plant_wilting.connect(_on_plant_wilting)
+	_growth.plant_recovered.connect(_on_plant_recovered)
+	_growth.plant_died.connect(_on_plant_died)
 	$FoodArea.body_entered.connect(_on_body_entered)
 	SeasonManager.season_changed.connect(_on_season_changed)
 	_apply_season_colours(SeasonManager.current_season)
@@ -61,6 +83,9 @@ func _process(delta):
 func _on_body_entered(body):
 	if is_depleted or cooldown_timer > 0:
 		return
+	# Only mature plants can feed roamers
+	if _growth and not _growth.is_mature():
+		return
 	var node = body
 	while node:
 		if node.is_in_group("roamers"):
@@ -72,8 +97,22 @@ func feed_roamer(roamer):
 	roamer.feed(food_value)
 	cooldown_timer = eat_cooldown
 	eat_count += 1
+	_shiver()
 	if eat_count >= max_eats:
 		deplete()
+
+## Quick shiver when a roamer eats from the bush.
+func _shiver() -> void:
+	var bush := get_node_or_null("Bush") as Node3D
+	if not bush:
+		return
+	# Always snap to 0 before animating so repeated calls can't accumulate rotation drift
+	bush.rotation.z = 0.0
+	var t := create_tween()
+	t.tween_property(bush, "rotation:z",  0.12, 0.06).set_trans(Tween.TRANS_SINE)
+	t.tween_property(bush, "rotation:z", -0.10, 0.07).set_trans(Tween.TRANS_SINE)
+	t.tween_property(bush, "rotation:z",  0.07, 0.06).set_trans(Tween.TRANS_SINE)
+	t.tween_property(bush, "rotation:z",  0.0,  0.08).set_trans(Tween.TRANS_SINE)
 
 func deplete():
 	is_depleted = true
@@ -83,4 +122,55 @@ func deplete():
 func regrow():
 	is_depleted = false
 	eat_count = 0
+	regrow_timer = 0.0
 	$Berries.visible = true
+
+# ── Watering Can API ──────────────────────────────────────────────────────────
+
+func water() -> void:
+	if _growth:
+		_growth.water()
+		_shiver()
+
+# ── Plant Growth callbacks ────────────────────────────────────────────────────
+
+func _on_growth_stage_changed(_new_stage: int) -> void:
+	# Re-register meshes after scale change so tint works
+	if _growth:
+		var meshes: Array = []
+		_collect_meshes(self, meshes)
+		_growth.register_meshes(meshes)
+
+func _on_plant_wilting() -> void:
+	# Turn the bush visibly yellow-brown via tint (handled by _apply_health_tint in component)
+	pass
+
+func _on_plant_recovered() -> void:
+	_apply_season_colours(SeasonManager.current_season)
+
+func _on_plant_died() -> void:
+	# Wither animation then remove
+	var tw := create_tween()
+	tw.tween_property(self, "scale", Vector3(0.05, 0.05, 0.05), 0.6).set_trans(Tween.TRANS_EXPO)
+	tw.tween_callback(queue_free)
+
+func _collect_meshes(node: Node, out: Array) -> void:
+	if node is MeshInstance3D:
+		out.append(node)
+	for c in node.get_children():
+		_collect_meshes(c, out)
+
+# ── Growth stage/progress accessors (used by save_manager) ───────────────────
+
+func get_growth_stage() -> int:
+	return _growth.stage if _growth else 0
+
+func get_growth_progress() -> float:
+	return _growth.growth_progress if _growth else 0.0
+
+func restore_growth(stage: int, progress: float) -> void:
+	if not _growth:
+		return
+	_growth.stage           = stage
+	_growth.growth_progress = progress
+	_growth._apply_stage_scale(false)

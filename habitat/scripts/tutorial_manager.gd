@@ -14,7 +14,6 @@ var _title_lbl : Label = null
 var _body_lbl  : Label = null
 var _btn       : Button = null
 var _skip_btn  : Button = null
-var _highlight : Panel = null  # transparent punch-out highlight box
 
 # ── Step data ─────────────────────────────────────────────────────────────────
 # Each step: { title, body, anchor } where anchor is a node path hint or ""
@@ -275,4 +274,4 @@ func _finish() -> void:
 		_card    = null
 		_overlay = null
 	)
-	emit_signal("tutorial_finished")
+	tutorial_finished.emit()

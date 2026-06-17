@@ -11,8 +11,10 @@ extends "res://scripts/roamer_base.gd"
 # ── Internal refs ─────────────────────────────────────────────────────────────
 var _anim: AnimationPlayer = null
 var _fox_mat: ShaderMaterial = null   # tail shader (surface 1)
+var _body_mat: ShaderMaterial = null  # body shader (surface 0) — duplicated per-instance
 
 func _ready():
+	species_id       = "GlowFox"
 	move_speed       = 2.8
 	dewdrop_interval = 4.0
 	super._ready()
@@ -33,6 +35,11 @@ func _setup_fox_mat():
 	var mesh := _find_mesh(model)
 	if not mesh:
 		return
+	# Duplicate the body shader (surface 0) — selection_highlight is on this one
+	var body_base: Material = mesh.get_active_material(0)
+	if body_base:
+		_body_mat = body_base.duplicate() as ShaderMaterial
+		mesh.set_surface_override_material(0, _body_mat)
 	# Duplicate the tail shader (surface 1) so each fox is independent
 	var base: Material = mesh.get_active_material(1)
 	if base:
@@ -132,34 +139,23 @@ func _get_selectable_mesh() -> MeshInstance3D:
 	return null
 
 func on_selected():
-	# Drive selection via shader uniform instead of StandardMaterial3D properties
-	var mesh := _get_selectable_mesh()
-	if mesh:
-		var mat := mesh.get_active_material(0)
-		if mat is ShaderMaterial:
-			mat.set_shader_parameter("selection_highlight", 1.0)
+	# Use the per-instance body mat — never touch the shared asset
+	if _body_mat:
+		_body_mat.set_shader_parameter("selection_highlight", 1.0)
 	if selection_ring:
 		selection_ring.visible = true
 		_ring_pulse_timer = 0.0
 
 func on_deselected():
-	var mesh := _get_selectable_mesh()
-	if mesh:
-		var mat := mesh.get_active_material(0)
-		if mat is ShaderMaterial:
-			mat.set_shader_parameter("selection_highlight", 0.0)
-	# Re-apply tail shader override in case it was cleared
-	if _fox_mat:
-		mesh = _get_selectable_mesh()
-		if mesh:
-			mesh.set_surface_override_material(1, _fox_mat)
+	if _body_mat:
+		_body_mat.set_shader_parameter("selection_highlight", 0.0)
 	if selection_ring:
 		selection_ring.visible = false
 
 # ── Wander — tighter range, biased toward food ───────────────────────────────
 
 func pick_wander_target():
-	var half_area := 19.0
+	var half_area: float = ZoneManager.get_garden_half() - 1.0
 	# 30 % chance: drift toward the nearest berry bush
 	if randf() < 0.3:
 		var food_items := get_tree().get_nodes_in_group("food")
@@ -171,11 +167,11 @@ func pick_wander_target():
 				if d < best_dist:
 					best_dist = d
 					nearest = item
-			var t := nearest.global_position + Vector3(
+			var food_target := nearest.global_position + Vector3(
 				randf_range(-1.5, 1.5), 0.0, randf_range(-1.5, 1.5))
 			wander_target = Vector3(
-				clamp(t.x, -half_area, half_area), t.y,
-				clamp(t.z, -half_area, half_area))
+				clamp(food_target.x, -half_area, half_area), food_target.y,
+				clamp(food_target.z, -half_area, half_area))
 			wander_timer = randf_range(3.0, 7.0)
 			return
 	# Standard wander — tighter radius than base (12 vs 20)
@@ -185,4 +181,4 @@ func pick_wander_target():
 	wander_target = Vector3(
 		clamp(t.x, -half_area, half_area), t.y,
 		clamp(t.z, -half_area, half_area))
-	wander_timer = randf_range(3.0, 8.0)
+	

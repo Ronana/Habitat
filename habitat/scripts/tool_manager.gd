@@ -12,6 +12,8 @@ var spade_radius: float = 1.2
 var spade_strength: float = 1.8
 var raise_terrain: bool = true
 var placement_item: String = ""
+var _fence_last_pos: Vector3   = Vector3.INF  # tracks last-placed fence for auto-orient
+var _fence_manual_rot: float   = 0.0          # R-key manual rotation offset (radians)
 var berry_bush_scene: PackedScene = preload("res://scenes/berry_bush.tscn")
 var tree_scene: PackedScene = preload("res://scenes/tree.tscn")
 var base_level: float = 0.0
@@ -19,9 +21,14 @@ var max_dig_depth: float = -2.0
 var can_raise_terrain: bool = false
 var terrain3d: Terrain3D        # Terrain3D plugin node (replaces old Ground MeshInstance3D)
 var starter_area_size: float = 40.0
-var shelter_scene: PackedScene    = preload("res://scenes/shelter.tscn")
-var wildgrass_scene: PackedScene  = preload("res://scenes/wildgrass.tscn")
-var cosy_burrow_scene: PackedScene = preload("res://scenes/cosy_burrow.tscn")
+var glowfox_den_scene: PackedScene       = preload("res://scenes/glowfox_den.tscn")
+var mossdeer_hollow_scene: PackedScene   = preload("res://scenes/mossdeer_hollow.tscn")
+var stoneback_cave_scene: PackedScene    = preload("res://scenes/stoneback_cave.tscn")
+var thornmouse_burrow_scene: PackedScene = preload("res://scenes/thornmouse_burrow.tscn")
+var emberowl_roost_scene: PackedScene    = preload("res://scenes/emberowl_roost.tscn")
+var crystalback_grotto_scene: PackedScene = preload("res://scenes/crystalback_grotto.tscn")
+var wildgrass_scene: PackedScene       = preload("res://scenes/wildgrass.tscn")
+var fence_panel_scene: PackedScene = preload("res://scenes/fence_panel.tscn")
 # Decoratives
 var flower_patch_scene: PackedScene     = preload("res://scenes/flower_patch.tscn")
 var mossy_rock_scene: PackedScene       = preload("res://scenes/mossy_rock.tscn")
@@ -32,6 +39,13 @@ var garden_lantern_scene: PackedScene   = preload("res://scenes/garden_lantern.t
 var glowing_mushroom_scene: PackedScene = preload("res://scenes/glowing_mushroom.tscn")
 var firefly_jar_scene: PackedScene      = preload("res://scenes/firefly_jar.tscn")
 var moss_torch_scene: PackedScene       = preload("res://scenes/moss_torch.tscn")
+# Torvald commissions
+var stone_bench_scene: PackedScene      = preload("res://scenes/stone_bench.tscn")
+var mossy_fountain_scene: PackedScene   = preload("res://scenes/mossy_fountain.tscn")
+var rune_totem_scene: PackedScene       = preload("res://scenes/rune_totem.tscn")
+var fire_ring_scene: PackedScene        = preload("res://scenes/fire_ring.tscn")
+var stone_archway_scene: PackedScene    = preload("res://scenes/stone_archway.tscn")
+var lantern_arch_scene: PackedScene     = preload("res://scenes/lantern_arch.tscn")
 var _shovel_menu: CanvasLayer = null
 var _pending_hit_pos: Vector3 = Vector3.ZERO
 var _pending_smash_item: Node3D = null
@@ -51,9 +65,13 @@ const POND_DEPTH   := -3.2
 const PLACEMENT_RADII: Dictionary = {
 	"Berry Seeds":      1.1,
 	"Oak Sapling":      2.0,
-	"Basic Shelter":    3.0,
+	"GlowFox Den":      2.8,
+	"MossDeer Hollow":  3.2,
+	"Stoneback Cave":   2.8,
+	"Thornmouse Burrow": 2.2,
+	"Emberowl Roost":   2.5,
+	"Crystalback Grotto": 3.0,
 	"Wildgrass Seeds":  0.8,
-	"Cosy Burrow":      2.4,
 	# Decoratives
 	"Flower Patch":     0.6,
 	"Mossy Rock":       0.9,
@@ -64,6 +82,15 @@ const PLACEMENT_RADII: Dictionary = {
 	"Glowing Mushroom": 0.5,
 	"Firefly Jar":      0.4,
 	"Moss Torch":       0.5,
+	# Fencing (small radius — can be placed close together)
+	"Fence Panel":      0.28,
+	# Torvald commissions
+	"Stone Bench":      1.0,
+	"Mossy Fountain":   1.1,
+	"Rune Totem":       0.7,
+	"Fire Ring":        1.1,
+	"Stone Archway":    1.6,
+	"Lantern Arch":     1.5,
 }
 # How much space each existing object group occupies
 const OBJECT_GROUP_RADII: Dictionary = {
@@ -76,7 +103,7 @@ const OBJECT_GROUP_RADII: Dictionary = {
 
 # Exposed publicly so ground_cursor can poll it for the preview colour.
 func is_placement_clear(pos: Vector3, item_name: String) -> bool:
-	var new_r: float = PLACEMENT_RADII.get(item_name, 1.5)
+	var new_r: float = PLACEMENT_RADII.get(item_name, 1.5) * GusManager.placement_radius_mult()
 	for group in OBJECT_GROUP_RADII:
 		var existing_r: float = OBJECT_GROUP_RADII[group]
 		var min_dist_sq: float = (new_r + existing_r) * (new_r + existing_r)
@@ -99,7 +126,6 @@ func _ready():
 	await get_tree().process_frame
 	_create_water_plane()
 	snap_all_statics()
-	print("ToolManager ready — using Terrain3D for terrain.")
 
 	# Spawn shovel context menu
 	_shovel_menu = load("res://scripts/shovel_menu.gd").new()
@@ -178,6 +204,25 @@ func set_active_tool(tool_id: String) -> void:
 	active_tool = tool_id
 
 func _input(event):
+	# ── Fence mode keyboard shortcuts ────────────────────────────────────
+	if placement_item == "Fence Panel":
+		if event is InputEventKey and event.pressed:
+			if event.keycode == KEY_R:
+				# Rotate next fence segment by 90°
+				_fence_manual_rot = fmod(_fence_manual_rot + PI * 0.5, TAU)
+				get_viewport().set_input_as_handled()
+				return
+			if event.keycode == KEY_ESCAPE:
+				# End fence mode
+				placement_item   = ""
+				_fence_last_pos  = Vector3.INF
+				_fence_manual_rot = 0.0
+				var ui_esc := get_parent().get_node_or_null("RoamerUI")
+				if ui_esc:
+					ui_esc.placement_label.modulate = Color(1, 1, 1, 1)
+					ui_esc.placement_label.text = ""
+				get_viewport().set_input_as_handled()
+				return
 	if not event is InputEventMouseButton:
 		return
 	if not event.pressed:
@@ -201,6 +246,13 @@ func _input(event):
 				get_viewport().set_input_as_handled()
 			return
 
+	# ── Watering can: left-click waters plants and roamers in range ─────────
+	if active_tool == "watering_can":
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			_do_water_action()
+			get_viewport().set_input_as_handled()
+			return
+
 	# ── Right click — place item if one is selected ───────────────────────────
 	if event.button_index == MOUSE_BUTTON_RIGHT:
 		if placement_item != "":
@@ -209,7 +261,8 @@ func _input(event):
 			return
 				
 func selected_roamer_exists() -> bool:
-	return get_parent().get_node("PlayerCursor").selected_roamer != null
+	var cursor := get_parent().get_node_or_null("PlayerCursor")
+	return cursor != null and is_instance_valid(cursor.selected_roamer)
 
 func place_item():
 	var cam = get_viewport().get_camera_3d()
@@ -223,6 +276,15 @@ func place_item():
 	var result = space_state.intersect_ray(query)
 	
 	if result:
+		# ── Zone boundary check ───────────────────────────────────────────────
+		var garden_half: float = ZoneManager.get_garden_half()
+		if abs(result.position.x) > garden_half or abs(result.position.z) > garden_half:
+			AudioManager.play_error()
+			var ui_oor = get_parent().get_node_or_null("RoamerUI")
+			if ui_oor:
+				ui_oor.placement_label.modulate = Color(1.0, 0.5, 0.2)
+				ui_oor.placement_label.text = "❌ Outside your garden boundary!"
+			return
 		# ── Clearance check ────────────────────────────────────────────────────
 		if not is_placement_clear(result.position, placement_item):
 			AudioManager.play_error()
@@ -240,6 +302,7 @@ func place_item():
 					var bush = berry_bush_scene.instantiate()
 					get_parent().add_child(bush)
 					bush.global_position = result.position
+					_plant_with_anim(bush, result.position)
 					WardenManager.gain_xp("bush_planted")
 					last_placed = bush
 					placed = true
@@ -248,16 +311,63 @@ func place_item():
 					var tree = tree_scene.instantiate()
 					get_parent().add_child(tree)
 					tree.global_position = result.position
+					_plant_with_anim(tree, result.position, 2.2)
 					WardenManager.gain_xp("bush_planted")
 					last_placed = tree
 					placed = true
-			"Basic Shelter":
-				if InventoryManager.remove_item("Basic Shelter"):
-					var shelter = shelter_scene.instantiate()
-					get_parent().add_child(shelter)
-					shelter.global_position = result.position
+			"GlowFox Den":
+				if InventoryManager.remove_item("GlowFox Den"):
+					var gf_den = glowfox_den_scene.instantiate()
+					get_parent().add_child(gf_den)
+					gf_den.global_position = result.position
+					_popplace_anim(gf_den)
 					WardenManager.gain_xp("shelter_placed")
-					last_placed = shelter
+					last_placed = gf_den
+					placed = true
+			"MossDeer Hollow":
+				if InventoryManager.remove_item("MossDeer Hollow"):
+					var md_hollow = mossdeer_hollow_scene.instantiate()
+					get_parent().add_child(md_hollow)
+					md_hollow.global_position = result.position
+					_popplace_anim(md_hollow)
+					WardenManager.gain_xp("shelter_placed")
+					last_placed = md_hollow
+					placed = true
+			"Stoneback Cave":
+				if InventoryManager.remove_item("Stoneback Cave"):
+					var sb_cave = stoneback_cave_scene.instantiate()
+					get_parent().add_child(sb_cave)
+					sb_cave.global_position = result.position
+					_popplace_anim(sb_cave)
+					WardenManager.gain_xp("shelter_placed")
+					last_placed = sb_cave
+					placed = true
+			"Thornmouse Burrow":
+				if InventoryManager.remove_item("Thornmouse Burrow"):
+					var tm_burrow = thornmouse_burrow_scene.instantiate()
+					get_parent().add_child(tm_burrow)
+					tm_burrow.global_position = result.position
+					_popplace_anim(tm_burrow)
+					WardenManager.gain_xp("shelter_placed")
+					last_placed = tm_burrow
+					placed = true
+			"Emberowl Roost":
+				if InventoryManager.remove_item("Emberowl Roost"):
+					var eo_roost = emberowl_roost_scene.instantiate()
+					get_parent().add_child(eo_roost)
+					eo_roost.global_position = result.position
+					_popplace_anim(eo_roost)
+					WardenManager.gain_xp("shelter_placed")
+					last_placed = eo_roost
+					placed = true
+			"Crystalback Grotto":
+				if InventoryManager.remove_item("Crystalback Grotto"):
+					var cb_grotto = crystalback_grotto_scene.instantiate()
+					get_parent().add_child(cb_grotto)
+					cb_grotto.global_position = result.position
+					_popplace_anim(cb_grotto)
+					WardenManager.gain_xp("shelter_placed")
+					last_placed = cb_grotto
 					placed = true
 			"Wildgrass Seeds":
 				if InventoryManager.remove_item("Wildgrass Seeds"):
@@ -266,16 +376,9 @@ func place_item():
 					grass.global_position = result.position
 					grass.rotation.y = randf_range(0.0, TAU)
 					grass.add_to_group("debris")
+					_plant_with_anim(grass, result.position, 1.4)
 					WardenManager.gain_xp("bush_planted")
 					last_placed = grass
-					placed = true
-			"Cosy Burrow":
-				if InventoryManager.remove_item("Cosy Burrow"):
-					var burrow = cosy_burrow_scene.instantiate()
-					get_parent().add_child(burrow)
-					burrow.global_position = result.position
-					WardenManager.gain_xp("shelter_placed")
-					last_placed = burrow
 					placed = true
 			# ── Decoratives ───────────────────────────────────────────────────
 			"Flower Patch":
@@ -284,6 +387,7 @@ func place_item():
 					get_parent().add_child(item)
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
 			"Mossy Rock":
@@ -292,6 +396,7 @@ func place_item():
 					get_parent().add_child(item)
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
 			"Mushroom Cluster":
@@ -300,6 +405,7 @@ func place_item():
 					get_parent().add_child(item)
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
 			"Fallen Log":
@@ -308,6 +414,7 @@ func place_item():
 					get_parent().add_child(item)
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
 			# ── Lighting ──────────────────────────────────────────────────────
@@ -317,6 +424,7 @@ func place_item():
 					get_parent().add_child(item)
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
 			"Glowing Mushroom":
@@ -325,6 +433,7 @@ func place_item():
 					get_parent().add_child(item)
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
 			"Firefly Jar":
@@ -332,6 +441,7 @@ func place_item():
 					var item = firefly_jar_scene.instantiate()
 					get_parent().add_child(item)
 					item.global_position = result.position
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
 			"Moss Torch":
@@ -340,17 +450,101 @@ func place_item():
 					get_parent().add_child(item)
 					item.global_position = result.position
 					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
 					WardenManager.gain_xp("decor_placed")
 					last_placed = item; placed = true
+			# ── Torvald Commissions ───────────────────────────────────────────────
+			"Stone Bench":
+				if InventoryManager.remove_item("Stone Bench"):
+					var item := stone_bench_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
+					WardenManager.gain_xp("decor_placed")
+					last_placed = item; placed = true
+			"Mossy Fountain":
+				if InventoryManager.remove_item("Mossy Fountain"):
+					var item := mossy_fountain_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					_popplace_anim(item)
+					WardenManager.gain_xp("decor_placed")
+					last_placed = item; placed = true
+			"Rune Totem":
+				if InventoryManager.remove_item("Rune Totem"):
+					var item := rune_totem_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					item.rotation.y = randf_range(0.0, TAU)
+					_popplace_anim(item)
+					WardenManager.gain_xp("decor_placed")
+					last_placed = item; placed = true
+			"Fire Ring":
+				if InventoryManager.remove_item("Fire Ring"):
+					var item := fire_ring_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					_popplace_anim(item)
+					WardenManager.gain_xp("decor_placed")
+					last_placed = item; placed = true
+			"Stone Archway":
+				if InventoryManager.remove_item("Stone Archway"):
+					var item := stone_archway_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					_popplace_anim(item)
+					WardenManager.gain_xp("decor_placed")
+					last_placed = item; placed = true
+			"Lantern Arch":
+				if InventoryManager.remove_item("Lantern Arch"):
+					var item := lantern_arch_scene.instantiate()
+					get_parent().add_child(item)
+					item.global_position = result.position
+					_popplace_anim(item)
+					WardenManager.gain_xp("decor_placed")
+					last_placed = item; placed = true
+			# ── Fencing ──────────────────────────────────────────────────────────
+			"Fence Panel":
+				if InventoryManager.remove_item("Fence Panel"):
+					var panel = fence_panel_scene.instantiate()
+					get_parent().add_child(panel)
+					# Snap to 0.5-unit grid so segments align cleanly
+					var fence_pos := Vector3(
+						round(result.position.x * 2.0) / 2.0,
+						result.position.y,
+						round(result.position.z * 2.0) / 2.0)
+					panel.global_position = fence_pos
+					# Auto-orient toward last placed segment (nearest 90°)
+					if _fence_last_pos != Vector3.INF:
+						var dir2d := Vector2(fence_pos.x - _fence_last_pos.x, fence_pos.z - _fence_last_pos.z)
+						if dir2d.length() > 0.1:
+							var raw_ang := atan2(dir2d.x, dir2d.y)
+							panel.rotation.y = round(raw_ang / (PI * 0.5)) * (PI * 0.5) + _fence_manual_rot
+						else:
+							panel.rotation.y = _fence_manual_rot
+					else:
+						panel.rotation.y = _fence_manual_rot
+					_fence_last_pos = fence_pos
+					_popplace_anim(panel)
+					WardenManager.gain_xp("decor_placed")
+					last_placed = panel; placed = true
 		if placed:
 			if last_placed:
 				last_placed.add_to_group("placeable_items")
-			placement_item = ""
+			# Fence mode is persistent — keep placing until player presses Escape
+			if placement_item != "Fence Panel":
+				placement_item = ""
+				var ui_done = get_parent().get_node_or_null("RoamerUI")
+				if ui_done:
+					ui_done.placement_label.modulate = Color(1, 1, 1, 1)
+					ui_done.placement_label.text = ""
+			else:
+				var ui_fence = get_parent().get_node_or_null("RoamerUI")
+				if ui_fence:
+					ui_fence.placement_label.modulate = Color(0.6, 0.9, 1.0, 1.0)
+					ui_fence.placement_label.text = "🪵 Fence mode — right-click to place · R to rotate · Esc to finish"
 			AudioManager.play_place()
-			var ui = get_parent().get_node_or_null("RoamerUI")
-			if ui:
-				ui.placement_label.modulate = Color(1, 1, 1, 1)
-				ui.placement_label.text = ""
 
 
 ## Raycast from mouse (centre + 4 offset rays) looking for a hittable world item.
@@ -397,10 +591,10 @@ func _raycast_terrain() -> Vector3:
 func _on_shovel_action(action: String) -> void:
 	match action:
 		"dig":
-			_deform_circle(_pending_hit_pos, DIG_RADIUS, DIG_STRENGTH, false)
+			_deform_circle(_pending_hit_pos, DIG_RADIUS * GusManager.shovel_radius_mult(), DIG_STRENGTH, false)
 		"fill":
 			# Strong fill — VP style, fills a crater in 1-2 clicks
-			_deform_circle(_pending_hit_pos, DIG_RADIUS * 2.5, 12.0, true)
+			_deform_circle(_pending_hit_pos, DIG_RADIUS * 2.5 * GusManager.shovel_radius_mult(), 12.0, true)
 		"pond":
 			_deform_circle(_pending_hit_pos, POND_RADIUS, absf(POND_DEPTH) * 2.2, false)
 		"smash":
@@ -509,8 +703,11 @@ func _sculpt_point(
 
 
 func set_placement_item(item_name: String):
+	# Reset fence state when switching away from fence mode
+	if item_name != "Fence Panel":
+		_fence_last_pos   = Vector3.INF
+		_fence_manual_rot = 0.0
 	placement_item = item_name
-	print("Ready to place: ", item_name)
 
 ## Terrain3D handles its own normals, collision, and rendering.
 ## apply_terrain_colours() and update_ground_collision() are no longer needed.
@@ -543,3 +740,166 @@ func _get_collision_rids(node: Node) -> Array:
 	for child in node.get_children():
 		rids.append_array(_get_collision_rids(child))
 	return rids
+
+
+# ── Placement animations ──────────────────────────────────────────────────────
+
+## Full seed planting animation (Berry Seeds, Wildgrass Seeds, Oak Sapling).
+## Animates only visual children (Node3D / MeshInstance3D that are NOT
+## CollisionObject3D), so Jolt Physics never sees a non-uniform scaled shape.
+## Call without await — runs as a fire-and-forget coroutine.
+func _plant_with_anim(node: Node3D, pos: Vector3, drop_height: float = 1.8) -> void:
+	# Collect visual children — skip any CollisionObject3D (Area3D, StaticBody3D …)
+	var visuals: Array[Node3D] = []
+	for child in node.get_children():
+		if child is Node3D and not (child is CollisionObject3D):
+			visuals.append(child as Node3D)
+
+	# Keep root at scale 1 (physics bodies stay happy); hide the whole node
+	node.visible = false
+
+	# ── Build glowing seed mesh ───────────────────────────────────────────────
+	var seed_mesh := MeshInstance3D.new()
+	var sphere    := SphereMesh.new()
+	sphere.radius = 0.11
+	sphere.height = 0.22
+	seed_mesh.mesh = sphere
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color               = Color(0.25, 0.75, 0.20)
+	mat.emission_enabled           = true
+	mat.emission                   = Color(0.35, 1.0, 0.25)
+	mat.emission_energy_multiplier = 2.0
+	seed_mesh.set_surface_override_material(0, mat)
+	get_parent().add_child(seed_mesh)
+	seed_mesh.global_position = pos + Vector3(0.0, drop_height, 0.0)
+
+	var ground_y := pos.y
+
+	# ── Phase 1: Drop with bounce ─────────────────────────────────────────────
+	var t1 := create_tween().set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	t1.tween_property(seed_mesh, "position:y", ground_y + 0.06, 0.42)
+	await t1.finished
+
+	# ── Phase 2: Little hop upward ────────────────────────────────────────────
+	var t2 := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t2.tween_property(seed_mesh, "position:y", ground_y + 0.45, 0.18)
+	await t2.finished
+
+	# ── Phase 3: Plant itself — drops and shrinks into ground ─────────────────
+	var t3 := create_tween()
+	t3.set_parallel(true)
+	t3.tween_property(seed_mesh, "position:y", ground_y - 0.04, 0.17) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t3.tween_property(seed_mesh, "scale", Vector3(0.01, 0.01, 0.01), 0.17) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await t3.finished
+
+	seed_mesh.queue_free()
+	_spawn_soil_puff(pos)
+
+	# ── Phase 4: Reveal node; spring-grow the visual children only ────────────
+	node.visible = true
+	if visuals.is_empty():
+		return
+	for v in visuals:
+		v.scale = Vector3(0.01, 0.01, 0.01)
+	# TRANS_SPRING naturally overshoots to ~1.05 then settles — no non-uniform needed
+	var t4 := create_tween().set_trans(Tween.TRANS_SPRING).set_ease(Tween.EASE_OUT)
+	t4.set_parallel(true)
+	for v in visuals:
+		t4.tween_property(v, "scale", Vector3(1.0, 1.0, 1.0), 0.55)
+
+
+## Simple pop-in for shelters, decoratives, and lighting items.
+## Same rule: animate visual children only, keep physics root at scale 1.
+func _popplace_anim(node: Node3D) -> void:
+	# Scale the root node so child proportions (non-uniform Transform3D scales) are preserved.
+	node.scale = Vector3(0.01, 0.01, 0.01)
+	var t := create_tween().set_trans(Tween.TRANS_SPRING).set_ease(Tween.EASE_OUT)
+	t.tween_property(node, "scale", Vector3(1.0, 1.0, 1.0), 0.38)
+
+
+## Burst of small soil particles at the planting point.
+func _spawn_soil_puff(pos: Vector3) -> void:
+	var puff := CPUParticles3D.new()
+	puff.emitting                = false
+	puff.one_shot                = true
+	puff.amount                  = 16
+	puff.lifetime                = 0.65
+	puff.explosiveness           = 0.92
+	puff.spread                  = 55.0
+	puff.gravity                 = Vector3(0.0, -5.0, 0.0)
+	puff.initial_velocity_min    = 1.2
+	puff.initial_velocity_max    = 2.8
+	puff.scale_amount_min        = 0.04
+	puff.scale_amount_max        = 0.13
+	puff.color                   = Color(0.28, 0.52, 0.14, 0.85)
+	get_parent().add_child(puff)
+	puff.global_position = pos + Vector3(0.0, 0.05, 0.0)
+	puff.emitting = true
+	await get_tree().create_timer(1.0).timeout
+	puff.queue_free()
+
+# ── Watering Can ──────────────────────────────────────────────────────────────
+
+func _do_water_action() -> void:
+	var hit_pos := _raycast_terrain()
+	if hit_pos == Vector3.INF:
+		return
+	const WATER_RADIUS := 2.5
+	var watered_any := false
+
+	# Water plants (food group)
+	for node in get_tree().get_nodes_in_group("food"):
+		if not node is Node3D:
+			continue
+		if node.global_position.distance_to(hit_pos) <= WATER_RADIUS:
+			if node.has_method("water"):
+				node.water()
+				watered_any = true
+
+	# Also water decorative plants (wildgrass seeds etc.)
+	for node in get_tree().get_nodes_in_group("placeable_items"):
+		if not node is Node3D:
+			continue
+		if node.global_position.distance_to(hit_pos) <= WATER_RADIUS:
+			if node.has_method("water"):
+				node.water()
+				watered_any = true
+
+	# Calm agitated roamers nearby
+	for node in get_tree().get_nodes_in_group("roamers"):
+		if not node is Node3D:
+			continue
+		if node.global_position.distance_to(hit_pos) <= WATER_RADIUS:
+			if node.has_method("calm_agitation"):
+				node.calm_agitation()
+				watered_any = true
+
+	# Always play splash at hit position
+	_spawn_water_splash(hit_pos)
+	if watered_any:
+		AudioManager.play_water()
+
+func _spawn_water_splash(pos: Vector3) -> void:
+	var p          := GPUParticles3D.new()
+	p.emitting      = true
+	p.one_shot      = true
+	p.explosiveness = 0.85
+	p.amount        = 24
+	p.lifetime      = 0.9
+	var mat                      := ParticleProcessMaterial.new()
+	mat.direction                 = Vector3(0, 1, 0)
+	mat.spread                    = 55.0
+	mat.initial_velocity_min      = 1.2
+	mat.initial_velocity_max      = 3.2
+	mat.gravity                   = Vector3(0, -5.0, 0)
+	mat.color                     = Color(0.35, 0.75, 1.0, 0.85)
+	p.process_material            = mat
+	var mesh      := SphereMesh.new()
+	mesh.radius    = 0.04
+	mesh.height    = 0.08
+	p.draw_pass_1  = mesh
+	get_parent().add_child(p)   # must be in tree before setting global_position
+	p.global_position = pos + Vector3(0, 0.15, 0)
+	p.finished.connect(p.queue_free)

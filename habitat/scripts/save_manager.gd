@@ -14,6 +14,7 @@ func save_game(_garden: Node):
 			"xp": WardenManager.current_xp,
 			"xp_to_next": WardenManager.xp_to_next_level
 		},
+		"zone": ZoneManager.current_zone,
 		"roamers": [],
 		"berry_bushes": []
 	}
@@ -64,7 +65,9 @@ func save_game(_garden: Node):
 				"x": bush.global_position.x,
 				"y": bush.global_position.y,
 				"z": bush.global_position.z
-			}
+			},
+			"growth_stage":    bush.get_growth_stage()    if bush.has_method("get_growth_stage")    else 2,
+			"growth_progress": bush.get_growth_progress() if bush.has_method("get_growth_progress") else 0.0
 		})
 		
 	# Save shelters
@@ -81,6 +84,7 @@ func save_game(_garden: Node):
 				"z": shelter.global_position.z
 			},
 			"resident_species": shelter.resident_species,
+			"locked_species": shelter.locked_species if shelter.get("locked_species") != null else "",
 			"assigned_roamer_uids": uids
 		})
 
@@ -100,28 +104,31 @@ func save_game(_garden: Node):
 	# Save milestones
 	save_data["milestones"] = MilestoneManager.achieved
 
+	# Save Gus upgrades
+	save_data["gus_upgrades"] = GusManager.purchased
+
 	# Write to file
 	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	file.store_string(JSON.stringify(save_data, "\t"))
 	file.close()
-	print("Game saved successfully!")
 
-func load_game(_garden: Node):
+
+func load_game(garden: Node):
 	if not FileAccess.file_exists(SAVE_PATH):
-		print("No save file found — starting fresh")
+
 		return false
 	
 	var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
 	var json_string = file.get_as_text()
 	file.close()
 	
-	var json = JSON.new()
-	var error = json.parse(json_string)
+	var json_parser := JSON.new()
+	var error := json_parser.parse(json_string)
 	if error != OK:
-		print("ERROR: Could not parse save file")
+		push_error("SaveManager: corrupt save file — could not parse JSON")
 		return false
-	
-	var save_data = json.get_data()
+
+	var save_data = json_parser.get_data()
 	
 	# Remove existing Roamers, bushes, and decoratives before loading
 	for roamer in get_tree().get_nodes_in_group("roamers"):
@@ -130,6 +137,10 @@ func load_game(_garden: Node):
 		bush.queue_free()
 	for decor in get_tree().get_nodes_in_group("decoratives"):
 		decor.queue_free()
+	# fences group is a subset of decoratives but clear explicitly for safety
+	for fence in get_tree().get_nodes_in_group("fences"):
+		if is_instance_valid(fence):
+			fence.queue_free()
 	
 	# Wait one frame for queue_free to complete
 	await get_tree().process_frame
@@ -138,6 +149,9 @@ func load_game(_garden: Node):
 	CurrencyManager.dewdrops = save_data["currency"]["dewdrops"]
 	CurrencyManager.eldermoss = save_data["currency"]["eldermoss"]
 	CurrencyManager.emit_signal("dewdrops_changed", CurrencyManager.dewdrops)
+
+	# Restore zone
+	ZoneManager.current_zone = save_data.get("zone", 0)
 
 	# Restore warden progression
 	if save_data.has("warden"):
@@ -176,7 +190,7 @@ func load_game(_garden: Node):
 					tool_manager.build_mesh_data_tool()
 					tool_manager.apply_terrain_colours()
 				
-				print("Terrain restored successfully")
+
 	
 	# Restore Roamers
 	for roamer_data in save_data["roamers"]:
@@ -197,7 +211,7 @@ func load_game(_garden: Node):
 				roamer.traits = saved_traits
 			if not roamer.is_adult:
 				roamer.scale = Vector3(0.6, 0.6, 0.6)
-			_garden.add_child(roamer)
+			garden.add_child(roamer)
 			roamer.global_position = Vector3(
 				roamer_data["position"]["x"],
 				roamer_data["position"]["y"],
@@ -211,23 +225,41 @@ func load_game(_garden: Node):
 	var bush_scene = load("res://scenes/berry_bush.tscn")
 	for bush_data in save_data["berry_bushes"]:
 		var bush = bush_scene.instantiate()
-		_garden.add_child(bush)
+		garden.add_child(bush)
 		bush.global_position = Vector3(
 			bush_data["position"]["x"],
 			bush_data["position"]["y"],
 			bush_data["position"]["z"]
 		)
+		var _gs : int   = bush_data.get("growth_stage",    2)
+		var _gp : float = bush_data.get("growth_progress", 0.0)
+		if bush.has_method("restore_growth"):
+			bush.restore_growth(_gs, _gp)
 		
 	# Restore shelters and re-link to their roamers by UID
 	if save_data.has("shelters"):
-		var shelter_scene = load("res://scenes/shelter.tscn")
+		# Map locked_species → scene path for species-specific dens.
+		const SHELTER_SCENES: Dictionary = {
+			"GlowFox":    "res://scenes/glowfox_den.tscn",
+			"Mossdeer":   "res://scenes/mossdeer_hollow.tscn",
+			"Stoneback":  "res://scenes/stoneback_cave.tscn",
+			"Thornmouse": "res://scenes/thornmouse_burrow.tscn",
+			"Emberowl":   "res://scenes/emberowl_roost.tscn",
+			"Crystalback":"res://scenes/crystalback_grotto.tscn",
+		}
+		var _fallback_shelter_scene = load("res://scenes/shelter.tscn")
 		# Build a UID → roamer lookup for fast matching
 		var uid_map: Dictionary = {}
 		for roamer in get_tree().get_nodes_in_group("roamers"):
 			uid_map[roamer.roamer_uid] = roamer
 		for shelter_data in save_data["shelters"]:
+			var locked: String = shelter_data.get("locked_species", "")
+			var scene_path: String = SHELTER_SCENES.get(locked, "")
+			var shelter_scene = load(scene_path) if scene_path != "" else _fallback_shelter_scene
+			if not shelter_scene:
+				shelter_scene = _fallback_shelter_scene
 			var shelter = shelter_scene.instantiate()
-			_garden.add_child(shelter)
+			garden.add_child(shelter)
 			shelter.global_position = Vector3(
 				shelter_data["position"]["x"],
 				shelter_data["position"]["y"],
@@ -258,7 +290,7 @@ func load_game(_garden: Node):
 			if not packed:
 				continue
 			var item = packed.instantiate()
-			_garden.add_child(item)
+			garden.add_child(item)
 			item.global_position = Vector3(
 				item_data["position"]["x"],
 				item_data["position"]["y"],
@@ -270,10 +302,12 @@ func load_game(_garden: Node):
 	if save_data.has("milestones"):
 		MilestoneManager.achieved = save_data["milestones"]
 
-	print("Game loaded successfully!")
+	# Restore Gus upgrades
+	if save_data.has("gus_upgrades"):
+		GusManager.purchased = save_data["gus_upgrades"]
+
 	return true
 
 func delete_save():
 	if FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH)
-		print("Save file deleted")

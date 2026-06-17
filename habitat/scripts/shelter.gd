@@ -1,9 +1,14 @@
 extends Node3D
 
+## If set, this shelter is permanently reserved for one species.
+## Generic shelters leave this blank and auto-lock on first resident.
+@export var locked_species: String = ""
+
 # All roamers currently living here
 var assigned_roamers: Array = []
 
-# Set on first resident; only roamers of this species can join after that
+# Active species lock — equals locked_species for species-specific dens,
+# or auto-set on first resident for generic shelters.
 var resident_species: String = ""
 
 var shelter_type: String = "Basic Shelter"
@@ -14,6 +19,10 @@ var is_occupied: bool:
 	get: return assigned_roamers.size() >= max_residents
 
 func _ready():
+	# Pre-lock species-specific dens immediately
+	if locked_species != "":
+		resident_species = locked_species
+		shelter_type     = locked_species + " Den"
 	$ShelterArea.body_entered.connect(_on_body_entered)
 	add_to_group("shelters")
 
@@ -51,7 +60,6 @@ func assign_roamer(roamer):
 	roamer.has_shelter = true
 	roamer.shelter_node = self
 	_update_label()
-	print(roamer.name, " has moved into their ", resident_species, " Den")
 	roamer.check_stage_progress()
 	if assigned_roamers.size() >= max_residents:
 		MilestoneManager.fire("first_full_den", "Full House! 🏠", resident_species + " Den is at full capacity.")
@@ -61,8 +69,8 @@ func unassign_roamer(roamer):
 	if roamer.has_shelter and roamer.shelter_node == self:
 		roamer.has_shelter = false
 		roamer.shelter_node = null
-	# Release species lock when the last resident leaves
-	if assigned_roamers.is_empty():
+	# Only release the species lock for generic shelters (locked_species == "")
+	if assigned_roamers.is_empty() and locked_species == "":
 		resident_species = ""
 	_update_label()
 
@@ -77,7 +85,7 @@ func get_display_name() -> String:
 
 func _update_label():
 	if assigned_roamers.is_empty():
-		$ShelterLabel.text = "Shelter"
+		$ShelterLabel.text = (locked_species + " Den" if locked_species != "" else "Shelter")
 		return
 	var count := assigned_roamers.size()
 	var den_name := resident_species + " Den" if resident_species != "" else "Den"

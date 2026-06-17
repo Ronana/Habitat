@@ -2,6 +2,14 @@ extends Node3D
 
 func _ready():
 	add_to_group("decoratives")
+	# Click/selection body — lets raycast hit this item
+	var _cb := StaticBody3D.new()
+	var _cs := CollisionShape3D.new()
+	var _sp := SphereShape3D.new()
+	_sp.radius = 0.6
+	_cs.shape  = _sp
+	_cb.add_child(_cs)
+	add_child(_cb)
 	_build()
 
 func _build():

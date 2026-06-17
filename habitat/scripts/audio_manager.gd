@@ -3,38 +3,17 @@ extends Node
 # Procedural audio manager — no external audio files required.
 # Generates simple tones for UI feedback and a gentle ambient pad.
 
-var _ui_player: AudioStreamPlayer
-var _ambient_player: AudioStreamPlayer
 var _ambient_timer: float = 0.0
 const AMBIENT_INTERVAL := 8.0   # seconds between ambient chirps
 
-func _ready():
-	_setup_ui_player()
-	_setup_ambient_player()
-	# Connect to game signals for audio feedback
-	if CurrencyManager.has_signal("dewdrops_changed"):
-		CurrencyManager.dewdrops_changed.connect(_on_dewdrops_changed)
-	if WardenManager.has_signal("level_up"):
-		WardenManager.level_up.connect(_on_level_up)
+func _ready() -> void:
+	WardenManager.level_up.connect(_on_level_up)
 
 func _process(delta):
 	_ambient_timer += delta
 	if _ambient_timer >= AMBIENT_INTERVAL:
 		_ambient_timer = 0.0
 		_play_ambient_chirp()
-
-# ── Setup ─────────────────────────────────────────────────────────────────────
-func _setup_ui_player():
-	_ui_player = AudioStreamPlayer.new()
-	_ui_player.bus = "Master"
-	_ui_player.volume_db = -12.0
-	add_child(_ui_player)
-
-func _setup_ambient_player():
-	_ambient_player = AudioStreamPlayer.new()
-	_ambient_player.bus = "Master"
-	_ambient_player.volume_db = -20.0
-	add_child(_ambient_player)
 
 # ── Tone generation ───────────────────────────────────────────────────────────
 func _play_tone(frequency: float, duration: float, volume_db: float = -12.0,
@@ -116,9 +95,24 @@ func _play_ambient_chirp():
 	await get_tree().create_timer(0.05 + randf() * 0.08).timeout
 	_play_tone(base * 1.25, 0.08, -24.0, "sine", true)
 
-# ── Signal handlers ───────────────────────────────────────────────────────────
-func _on_dewdrops_changed(_amount):
-	pass  # Only play on explicit buy, not every change
+func play_water():
+	# Gentle water-pour: descending bubbling tones
+	_play_tone(880.0, 0.06, -18.0, "sine")
+	await get_tree().create_timer(0.05).timeout
+	_play_tone(740.0, 0.07, -18.0, "sine")
+	await get_tree().create_timer(0.05).timeout
+	_play_tone(660.0, 0.08, -19.0, "sine")
+	await get_tree().create_timer(0.06).timeout
+	_play_tone(550.0, 0.10, -20.0, "sine")
 
-func _on_level_up(_level):
+func play_agitated():
+	# Low growl-like descending buzz — signals conflict between roamers
+	_play_tone(180.0, 0.12, -14.0, "soft_square")
+	await get_tree().create_timer(0.10).timeout
+	_play_tone(150.0, 0.18, -14.0, "soft_square")
+	await get_tree().create_timer(0.10).timeout
+	_play_tone(120.0, 0.22, -16.0, "soft_square")
+
+# ── Signal handlers ───────────────────────────────────────────────────────────
+func _on_level_up(_level: int) -> void:
 	play_level_up()

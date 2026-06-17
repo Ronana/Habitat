@@ -1,0 +1,169 @@
+[gd_scene format=3 uid="uid://xtobc2pv4rc7"]
+
+[ext_resource type="Script" path="res://scripts/crystalback.gd" id="1_cb"]
+
+; ── Materials ──────────────────────────────────────────────────────────────────
+[sub_resource type="StandardMaterial3D" id="Mat_shell"]
+albedo_color = Color(0.62, 0.82, 0.95, 0.85)
+roughness = 0.15
+metallic = 0.2
+transparency = 1
+emission_enabled = true
+emission = Color(0.40, 0.70, 1.0, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_shell_face"]
+albedo_color = Color(0.45, 0.65, 0.88, 1)
+roughness = 0.25
+metallic = 0.3
+
+[sub_resource type="StandardMaterial3D" id="Mat_skin"]
+albedo_color = Color(0.42, 0.52, 0.38, 1)
+roughness = 0.88
+
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.14, 0.18, 0.12, 1)
+roughness = 0.80
+
+[sub_resource type="StandardMaterial3D" id="Mat_underbelly"]
+albedo_color = Color(0.55, 0.62, 0.48, 1)
+roughness = 0.90
+
+; ── Meshes ─────────────────────────────────────────────────────────────────────
+[sub_resource type="SphereMesh" id="Mesh_shell"]
+material = SubResource("Mat_shell")
+radius = 0.44
+height = 0.68
+
+; Extra facet layers to sell the crystal look
+[sub_resource type="BoxMesh" id="Mesh_facet_a"]
+material = SubResource("Mat_shell_face")
+size = Vector3(0.62, 0.55, 0.55)
+
+[sub_resource type="BoxMesh" id="Mesh_facet_b"]
+material = SubResource("Mat_shell_face")
+size = Vector3(0.45, 0.60, 0.62)
+
+[sub_resource type="SphereMesh" id="Mesh_rim"]
+material = SubResource("Mat_skin")
+radius = 0.46
+height = 0.20
+
+[sub_resource type="SphereMesh" id="Mesh_belly"]
+material = SubResource("Mat_underbelly")
+radius = 0.42
+height = 0.14
+
+[sub_resource type="CylinderMesh" id="Mesh_leg"]
+material = SubResource("Mat_skin")
+top_radius = 0.075
+bottom_radius = 0.080
+height = 0.20
+
+[sub_resource type="CylinderMesh" id="Mesh_neck"]
+material = SubResource("Mat_skin")
+top_radius = 0.06
+bottom_radius = 0.08
+height = 0.16
+
+[sub_resource type="SphereMesh" id="Mesh_head"]
+material = SubResource("Mat_skin")
+radius = 0.12
+height = 0.18
+
+[sub_resource type="SphereMesh" id="Mesh_eye"]
+material = SubResource("Mat_dark")
+radius = 0.028
+height = 0.034
+
+[sub_resource type="SphereMesh" id="Mesh_tail"]
+material = SubResource("Mat_skin")
+radius = 0.060
+height = 0.09
+
+; ── Collision ──────────────────────────────────────────────────────────────────
+[sub_resource type="CapsuleShape3D" id="Col"]
+radius = 0.46
+height = 0.88
+
+; ── Scene tree ─────────────────────────────────────────────────────────────────
+[node name="Crystalback" type="CharacterBody3D" groups=["roamers"]]
+floor_max_angle = 1.5707964
+floor_snap_length = 0.5
+script = ExtResource("1_cb")
+
+; Crystal shell dome — named Shell so script can scale it
+[node name="Shell" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.08, 0, 0, 0, 0.72, 0, 0, 0, 1.12, 0, 0.44, 0)
+mesh = SubResource("Mesh_shell")
+
+; Crystal facet overlays — rotated boxes to simulate cut crystal faces
+[node name="FacetA" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.866, 0.5, 0, -0.5, 0.866, 0, 0, 0, 1, 0, 0.46, 0)
+mesh = SubResource("Mesh_facet_a")
+
+[node name="FacetB" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 0, 0.46, 0)
+mesh = SubResource("Mesh_facet_b")
+
+; Shell rim — skin-coloured skirt
+[node name="ShellRim" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.12, 0, 0, 0, 0.18, 0, 0, 0, 1.16, 0, 0.24, 0)
+mesh = SubResource("Mesh_rim")
+
+; Belly
+[node name="Belly" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.05, 0, 0, 0, 0.14, 0, 0, 0, 1.08, 0, 0.18, 0)
+mesh = SubResource("Mesh_belly")
+
+; Legs
+[node name="FrontLegL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.30, 0.10, -0.26)
+mesh = SubResource("Mesh_leg")
+
+[node name="FrontLegR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.30, 0.10, -0.26)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.30, 0.10, 0.26)
+mesh = SubResource("Mesh_leg")
+
+[node name="BackLegR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.30, 0.10, 0.26)
+mesh = SubResource("Mesh_leg")
+
+; Neck
+[node name="Neck" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.940, -0.342, 0, 0.342, 0.940, 0, 0.28, -0.42)
+mesh = SubResource("Mesh_neck")
+
+; Head
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, -0.54)
+mesh = SubResource("Mesh_head")
+
+; Eyes
+[node name="EyeL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.08, 0.28, -0.62)
+mesh = SubResource("Mesh_eye")
+
+[node name="EyeR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.08, 0.28, -0.62)
+mesh = SubResource("Mesh_eye")
+
+; Tail
+[node name="Tail" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.20, 0.48)
+mesh = SubResource("Mesh_tail")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.44, 0)
+shape = SubResource("Col")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
+billboard = 1
+no_depth_test = true
+text = "Crystalback"
+font_size = 22

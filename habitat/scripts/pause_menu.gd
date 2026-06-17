@@ -4,15 +4,15 @@
 extends CanvasLayer
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
-const C_BG     := Color(0.04, 0.07, 0.04, 0.92)
-const C_BORDER := Color(0.28, 0.46, 0.22, 1.00)
-const C_TEXT   := Color(0.93, 0.91, 0.82, 1.00)
-const C_MUTED  := Color(0.62, 0.72, 0.52, 1.00)
-const C_ACCENT := Color(0.52, 0.82, 0.32, 1.00)
-const C_BTN    := Color(0.12, 0.22, 0.09, 1.00)
-const C_BTN_H  := Color(0.22, 0.38, 0.17, 1.00)
-const C_DANGER := Color(0.38, 0.10, 0.08, 1.00)
-const C_DANGER_H := Color(0.55, 0.15, 0.10, 1.00)
+const C_BG     := Color(0.04, 0.01, 0.09, 0.97)
+const C_BORDER := Color(0.55, 0.20, 0.80, 1.00)
+const C_TEXT   := Color(0.93, 0.91, 0.96, 1.00)
+const C_MUTED  := Color(0.60, 0.50, 0.75, 1.00)
+const C_ACCENT := Color(0.78, 0.38, 0.96, 1.00)
+const C_BTN    := Color(0.10, 0.03, 0.20, 1.00)
+const C_BTN_H  := Color(0.20, 0.06, 0.36, 1.00)
+const C_DANGER := Color(0.38, 0.06, 0.12, 1.00)
+const C_DANGER_H := Color(0.55, 0.10, 0.18, 1.00)
 
 var _root: Control = null
 var _menu_container: PanelContainer = null
@@ -49,21 +49,27 @@ func _build():
 	# Dark overlay behind the panel
 	var overlay := ColorRect.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	overlay.color = Color(0.0, 0.0, 0.0, 0.55)
+	overlay.color = Color(0.01, 0.0, 0.04, 0.72)
 	_root.add_child(overlay)
 
 	# Centred panel
+	var centre := CenterContainer.new()
+	centre.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(centre)
+
 	_menu_container = PanelContainer.new()
-	_menu_container.custom_minimum_size = Vector2(300, 0)
-	_menu_container.set_anchors_preset(Control.PRESET_CENTER)
+	_menu_container.custom_minimum_size = Vector2(380, 0)
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = C_BG
 	bg.border_color = C_BORDER
 	bg.set_border_width_all(2)
 	bg.set_corner_radius_all(14)
 	bg.set_content_margin_all(28)
+	bg.shadow_color = Color(0.40, 0.10, 0.70, 0.55)
+	bg.shadow_size  = 16
+	bg.shadow_offset = Vector2(0, 4)
 	_menu_container.add_theme_stylebox_override("panel", bg)
-	_root.add_child(_menu_container)
+	centre.add_child(_menu_container)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 10)
@@ -72,7 +78,7 @@ func _build():
 
 	# Title
 	var title := Label.new()
-	title.text = "⏸  Paused"
+	title.text = "✦  Paused"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 26)
 	title.add_theme_color_override("font_color", C_ACCENT)
@@ -177,7 +183,7 @@ func _show_feedback(msg: String, colour: Color):
 func _add_btn(parent: VBoxContainer, text: String, callback: Callable, danger: bool):
 	var btn := Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(240, 44)
+	btn.custom_minimum_size = Vector2(320, 48)
 	var norm_col  := C_DANGER   if danger else C_BTN
 	var hover_col := C_DANGER_H if danger else C_BTN_H
 	var norm := _btn_style(norm_col)
@@ -186,7 +192,7 @@ func _add_btn(parent: VBoxContainer, text: String, callback: Callable, danger: b
 	btn.add_theme_stylebox_override("hover",   hover)
 	btn.add_theme_stylebox_override("pressed", norm)
 	btn.add_theme_color_override("font_color",         C_TEXT)
-	btn.add_theme_color_override("font_hover_color",   C_ACCENT if not danger else Color(1, 0.7, 0.5))
+	btn.add_theme_color_override("font_hover_color",   C_ACCENT if not danger else Color(1.0, 0.52, 0.52))
 	btn.add_theme_color_override("font_pressed_color", C_TEXT)
 	btn.add_theme_font_size_override("font_size", 15)
 	btn.pressed.connect(callback)

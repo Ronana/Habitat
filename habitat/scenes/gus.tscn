@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://gus_npc"]
+
+[ext_resource type="Script" path="res://scripts/gus.gd" id="1_gus"]
+
+[sub_resource type="SphereShape3D" id="InteractShape"]
+radius = 2.5
+
+[sub_resource type="CapsuleShape3D" id="BodyShape"]
+radius = 0.38
+height = 1.8
+
+[node name="Gus" type="Node3D"]
+script = ExtResource("1_gus")
+
+[node name="NameLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
+billboard = 1
+no_depth_test = true
+modulate = Color(0.88, 0.80, 0.62, 1)
+text = "Gus the Groundskeeper"
+font_size = 28
+outline_size = 6
+
+[node name="InteractionArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractionArea"]
+shape = SubResource("InteractShape")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("BodyShape")

@@ -46,9 +46,8 @@ func pick_new_weather():
 
 func set_weather(new_weather: Weather):
 	current_weather = new_weather
-	emit_signal("weather_changed", new_weather)
+	weather_changed.emit(new_weather)
 	apply_weather_effects()
-	print("Weather changed to: ", get_weather_name())
 
 func apply_weather_effects():
 	if not environment or not sun:

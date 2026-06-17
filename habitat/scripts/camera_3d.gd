@@ -21,7 +21,7 @@ var max_zoom: float = 21.0
 var target_zoom: float = 21.0
 var current_zoom: float = 21.0
 
-const CAMERA_BOUND := 30.0   # starter_area half (20) + 10 overflow units
+var camera_bound: float = 30.0  # updated when zone expands
 
 # Panning with middle mouse
 var is_panning: bool = false
@@ -40,6 +40,19 @@ func _ready():
 	_apply_settings()
 	if SettingsManager:
 		SettingsManager.settings_changed.connect(_apply_settings)
+	# Sync bound to current zone on start, then update on unlock
+	_sync_camera_bound()
+	ZoneManager.zone_unlocked.connect(_on_zone_expanded)
+
+func _sync_camera_bound() -> void:
+	camera_bound = ZoneManager.get_garden_half() + 10.0
+
+func _on_zone_expanded(_zone_index: int) -> void:
+	var new_bound: float = ZoneManager.get_garden_half() + 10.0
+	# Smoothly allow the camera to pan to the new edge
+	camera_bound = new_bound
+	# Also expand max zoom slightly so the player can see the new area
+	max_zoom = min(42.0, ZoneManager.get_garden_half() * 1.5)
 
 func _apply_settings():
 	move_speed      = SettingsManager.get_setting("cam_move_speed",     20.0)
@@ -55,8 +68,8 @@ func _process(delta):
 	handle_zoom(delta)
 
 	# Clamp to play area + overflow allowance
-	focus_point.x = clamp(focus_point.x, -CAMERA_BOUND, CAMERA_BOUND)
-	focus_point.z = clamp(focus_point.z, -CAMERA_BOUND, CAMERA_BOUND)
+	focus_point.x = clamp(focus_point.x, -camera_bound, camera_bound)
+	focus_point.z = clamp(focus_point.z, -camera_bound, camera_bound)
 
 	# Smooth position
 	global_position = global_position.lerp(target_position, smooth_speed * delta)
@@ -128,9 +141,9 @@ func handle_zoom(delta):
 ## Smoothly pan to a world position and zoom in slightly — called on item select.
 func focus_on(world_pos: Vector3) -> void:
 	var clamped := Vector3(
-		clamp(world_pos.x, -CAMERA_BOUND, CAMERA_BOUND),
+		clamp(world_pos.x, -camera_bound, camera_bound),
 		0.0,
-		clamp(world_pos.z, -CAMERA_BOUND, CAMERA_BOUND)
+		clamp(world_pos.z, -camera_bound, camera_bound)
 	)
 	var tw := create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tw.tween_property(self, "focus_point", clamped, 0.45)

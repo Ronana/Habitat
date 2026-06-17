@@ -7,6 +7,14 @@ var _check_timer: float = 0.0
 
 func _ready():
 	add_to_group("decoratives")
+	# Click/selection body — lets raycast hit this item
+	var _cb := StaticBody3D.new()
+	var _cs := CollisionShape3D.new()
+	var _sp := SphereShape3D.new()
+	_sp.radius = 0.5
+	_cs.shape  = _sp
+	_cb.add_child(_cs)
+	add_child(_cb)
 	_build()
 	# Set initial state immediately
 	_check_timer = 2.0  # force first check

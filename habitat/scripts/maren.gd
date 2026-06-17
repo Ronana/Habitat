@@ -1,42 +1,110 @@
-## maren.gd — Maren the Seedkeeper NPC.
+## maren.gd — Sam the Seedkeeper NPC.
 ## Handles the shop, idle animations (breathing bob, head tracking),
 ## a procedural fabric shader on the robe, floating seed particles,
 ## and a pulsing crystal glow.
 extends Node3D
 
 # ── Shop data ─────────────────────────────────────────────────────────────────
+# sell_price is what Sam pays YOU when selling back. 0 = not sellable.
 var shop_items := [
 	# Essentials
-	{"name": "Berry Seeds",      "cost": 10.0, "min_level": 1,
+	{"name": "Berry Seeds",      "cost": 10.0, "sell_price": 4.0,  "min_level": 1,
 		"description": "Plant a berry bush. Roamers will seek it out when hungry."},
-	{"name": "Roamer Treat",     "cost": 8.0,  "min_level": 1,
+	{"name": "Roamer Treat",     "cost": 8.0,  "sell_price": 3.0,  "min_level": 1,
 		"description": "A tasty snack. Select a Roamer then use from inventory to feed them."},
-	{"name": "Oak Sapling",      "cost": 25.0, "min_level": 1,
+	{"name": "Oak Sapling",      "cost": 25.0, "sell_price": 10.0, "min_level": 1,
 		"description": "Plant a tree. Woodland Roamers love to shelter beneath them."},
-	{"name": "Basic Shelter",    "cost": 30.0, "min_level": 1,
-		"description": "A cosy home for a Roamer. Place it to help Roamers become Residents."},
-	{"name": "Wildgrass Seeds",  "cost": 15.0, "min_level": 2,
+	{"name": "GlowFox Den",      "cost": 40.0, "sell_price": 18.0, "min_level": 1,
+		"description": "A glowing den for GlowFoxes. Place it to help GlowFoxes settle as Residents."},
+	{"name": "MossDeer Hollow",  "cost": 45.0, "sell_price": 20.0, "min_level": 1,
+		"description": "A mossy woodland hollow for MossDeer. Large enough for a small herd."},
+	{"name": "Stoneback Cave",   "cost": 40.0, "sell_price": 18.0, "min_level": 1,
+		"description": "A sturdy stone cave for Stonebacks. Built to last like the creatures inside."},
+	{"name": "Thornmouse Burrow", "cost": 35.0, "sell_price": 15.0, "min_level": 2,
+		"description": "A cosy underground burrow for Thornmice. Lined with dry grass and hidden from predators."},
+	{"name": "Emberowl Roost",  "cost": 50.0, "sell_price": 22.0, "min_level": 3,
+		"description": "A hollowed-out tree stump with an ember-warm interior. Emberowls love to sleep inside by day."},
+	{"name": "Crystalback Grotto", "cost": 60.0, "sell_price": 26.0, "min_level": 4,
+		"description": "A crystal-studded rock grotto that pulses with soft blue light. Draws Crystalbacks who find it irresistible."},
+	{"name": "Wildgrass Seeds",  "cost": 15.0, "sell_price": 6.0,  "min_level": 2,
 		"description": "Plant wild grass. Increases the space felt by nearby Roamers."},
-	{"name": "Cosy Burrow",      "cost": 55.0, "min_level": 3,
-		"description": "A snug underground den. Provides stronger safety than a Basic Shelter."},
 	# Decoratives
-	{"name": "Flower Patch",     "cost": 12.0, "min_level": 1,
+	{"name": "Flower Patch",     "cost": 12.0, "sell_price": 5.0,  "min_level": 1,
 		"description": "A cluster of colourful wildflowers. Brightens up any corner of the garden."},
-	{"name": "Mossy Rock",       "cost": 18.0, "min_level": 1,
+	{"name": "Mossy Rock",       "cost": 18.0, "sell_price": 8.0,  "min_level": 1,
 		"description": "A mossy boulder. Roamers like to sit near large rocks."},
-	{"name": "Mushroom Cluster", "cost": 14.0, "min_level": 2,
+	{"name": "Mushroom Cluster", "cost": 14.0, "sell_price": 6.0,  "min_level": 2,
 		"description": "Earthy toadstools in autumnal shades. A favourite of Stonebacks."},
-	{"name": "Fallen Log",       "cost": 22.0, "min_level": 2,
+	{"name": "Fallen Log",       "cost": 22.0, "sell_price": 9.0,  "min_level": 2,
 		"description": "A mossy log. Adds a woodland feel and gives critters a place to rest beside."},
 	# Lighting
-	{"name": "Garden Lantern",   "cost": 40.0, "min_level": 2,
+	{"name": "Garden Lantern",   "cost": 40.0, "sell_price": 16.0, "min_level": 2,
 		"description": "A warm lantern that lights up at dusk. Keeps the garden cosy through the night."},
-	{"name": "Glowing Mushroom", "cost": 35.0, "min_level": 3,
+	{"name": "Glowing Mushroom", "cost": 35.0, "sell_price": 14.0, "min_level": 3,
 		"description": "A bioluminescent mushroom that pulses with soft blue-green light."},
-	{"name": "Firefly Jar",      "cost": 30.0, "min_level": 3,
+	{"name": "Firefly Jar",      "cost": 30.0, "sell_price": 12.0, "min_level": 3,
 		"description": "A sealed jar full of fireflies. Flickers gently and releases sparkles."},
-	{"name": "Moss Torch",       "cost": 45.0, "min_level": 4,
+	{"name": "Moss Torch",       "cost": 45.0, "sell_price": 18.0, "min_level": 4,
 		"description": "A stone torch draped in moss. Casts a warm, flickering glow over a wide area."},
+	# Fencing
+	{"name": "Fence Panel",      "cost": 8.0,  "sell_price": 3.0,  "min_level": 1,
+		"description": "A sturdy wooden fence segment. Right-click to place; keep clicking to build a run. Press R to rotate, Esc to finish."},
+	# Care items
+	{"name": "Restorative Berry", "cost": 25.0, "sell_price": 0.0, "min_level": 3,
+		"description": "A glowing berry infused with elderwood magic. Clears a struggling Roamer's burden and restores their strength. Gift it to a selected Roamer."},
+]
+
+# ── Dialogue pools ─────────────────────────────────────────────────────────────
+const GREETINGS_MORNING: Array = [
+	"Morning! The seeds are practically jumping out of my satchel today.",
+	"Early start? The garden thanks you. So do I — got fresh stock in.",
+	"Good morning! Best time of day to plant something new, if you ask me.",
+	"Ah, you're up with the dew! Wonderful. Let's see what takes your fancy.",
+	"Morning light, fresh seeds. You've got good timing.",
+]
+const GREETINGS_AFTERNOON: Array = [
+	"Afternoon! How's the garden coming along? Anything need restocking?",
+	"Perfect timing — I just sorted out the shelves. Take a look.",
+	"Good afternoon! The roamers looking lively today?",
+	"Busy day? I've had a few wanderers stop by. You're my favourite though.",
+	"Ah, the Warden! Come in, come in. Plenty to choose from.",
+]
+const GREETINGS_EVENING: Array = [
+	"Evening already? Time flies when you're tending a garden.",
+	"Still at it? Good. The best gardeners work by moonrise.",
+	"The GlowFoxes'll be waking up soon. Good time to stock up on light sources.",
+	"Evening! I was about to close up, but I'll stay open for you.",
+	"Getting dark — perfect time to pick up a lantern or two.",
+]
+const GREETINGS_NIGHT: Array = [
+	"You're up late! The garden doesn't sleep, and neither do I apparently.",
+	"Midnight stock check — you caught me. Browse away.",
+	"The roamers are sleeping, so why aren't you? …Why aren't I? Anyway — shopping!",
+	"Stars are out. Makes everything feel more magical, don't you think?",
+	"Night shift Warden! I respect the dedication. What can I get you?",
+]
+
+const PURCHASE_LINES: Array = [
+	"Lovely choice. Your garden's going to be thriving.",
+	"Excellent taste. The roamers will appreciate that.",
+	"Good pick! That one always sells well.",
+	"There you go. Come back whenever you need more.",
+	"A fine investment. I always say — spend on the garden, earn it back tenfold.",
+	"Done and dusted. Your dewdrops are well spent.",
+]
+const BROKE_LINES: Array = [
+	"Hmm — dewdrops running a bit low, are they? Come back when you've topped up.",
+	"I'd love to help, but dewdrops don't lie! Not enough there, I'm afraid.",
+	"The roamers will earn you more if you keep them happy. Short a few drops right now.",
+	"Can't quite stretch to that one yet. Patience — the dewdrops will flow.",
+	"Not quite enough, I'm afraid! Give the garden a bit of time.",
+]
+const SELL_LINES: Array = [
+	"I can always use stock. Fair deal.",
+	"Good condition too. I'll take it.",
+	"Done. Always happy to buy back from a well-kept garden.",
+	"Sold! Dewdrops straight to your pocket.",
+	"Pleasure doing business with you.",
 ]
 
 var is_shop_open := false
@@ -57,6 +125,7 @@ var _ring_pulse_timer: float = 0.0
 
 # ── Ready ──────────────────────────────────────────────────────────────────────
 func _ready() -> void:
+	add_to_group("npcs")
 	_breathe_phase = randf() * TAU
 	_base_y        = position.y
 
@@ -252,29 +321,56 @@ func hide_selection_ring() -> void:
 	if selection_ring:
 		selection_ring.visible = false
 
-# ── Interaction ────────────────────────────────────────────────────────────────
-func _on_body_entered(body: Node3D) -> void:
-	print("Someone entered Maren's area: ", body.name)
-
-func open_shop() -> void:
-	is_shop_open = true
-	print("Maren's shop is open!")
-	print("--- Maren's Wares ---")
-	for i in range(shop_items.size()):
-		var item: Dictionary = shop_items[i]
-		print(i, ". ", item["name"], " — ", item["cost"], " Dewdrops — ", item["description"])
-	print("Current Dewdrops: ", CurrencyManager.dewdrops)
-
-func buy_item(index: int) -> void:
-	if index >= shop_items.size():
-		print("Invalid item")
-		return
-	var item: Dictionary = shop_items[index]
-	if CurrencyManager.spend_dewdrops(item["cost"]):
-		print("Purchased: ", item["name"])
-		apply_purchase(item["name"])
+# ── Dialogue helpers ──────────────────────────────────────────────────────────
+func get_greeting() -> String:
+	var t: float = DayNightManager.current_time
+	var pool: Array
+	if t >= 5.0 and t < 12.0:
+		pool = GREETINGS_MORNING
+	elif t >= 12.0 and t < 18.0:
+		pool = GREETINGS_AFTERNOON
+	elif t >= 18.0 and t < 21.0:
+		pool = GREETINGS_EVENING
 	else:
-		print("Not enough Dewdrops!")
+		pool = GREETINGS_NIGHT
+	return pool[randi() % pool.size()]
+
+func get_purchase_line() -> String:
+	return PURCHASE_LINES[randi() % PURCHASE_LINES.size()]
+
+func get_broke_line() -> String:
+	return BROKE_LINES[randi() % BROKE_LINES.size()]
+
+func get_sell_line() -> String:
+	return SELL_LINES[randi() % SELL_LINES.size()]
+
+## Returns the sell price for an inventory item name, or 0 if Sam won't buy it.
+func get_sell_price(item_name: String) -> float:
+	for item in shop_items:
+		if item["name"] == item_name:
+			return item.get("sell_price", 0.0)
+	return 0.0
+
+# ── Interaction ────────────────────────────────────────────────────────────────
+func _on_body_entered(_body: Node3D) -> void:
+	pass
 
 func apply_purchase(item_name: String) -> void:
 	InventoryManager.add_item(item_name)
+
+func buy_item(index: int) -> void:
+	if index < 0 or index >= shop_items.size():
+		return
+	var item: Dictionary = shop_items[index]
+	if CurrencyManager.spend_dewdrops(item["cost"]):
+		apply_purchase(item["name"])
+		WardenManager.gain_xp("item_purchased")
+
+func sell_item(item_name: String) -> bool:
+	var price: float = get_sell_price(item_name)
+	if price <= 0.0:
+		return false
+	if not InventoryManager.remove_item(item_name):
+		return false
+	CurrencyManager.add_dewdrops(price)
+	return true
